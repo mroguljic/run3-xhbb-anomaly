@@ -1,0 +1,6 @@
+CMSSW*
+TIMBER
+__pycache__
+filelists/test_files/
+filelists/__pycache__/
+*root
