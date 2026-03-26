@@ -9,6 +9,7 @@ import TIMBER.Tools.AutoJetID as AutoJetID
 import TIMBER.Tools.AutoJetVetoMap as AutoJetVetoMap
 import TIMBER.Tools.AutoJME_correctionlib as AutoJME
 from corrections import corrections_paths
+from preselection_branches import get_preselection_snapshot_columns
 
 
 def get_n_weighted(analyzer: Analyzer, is_data: bool) -> Union[int, float]:
@@ -63,13 +64,14 @@ def is_data(analyzer: Analyzer) -> bool:
         print("Running on MC")
     return is_data
 
+
 def detect_era(input_path: str) -> str:
     """
     Detect the data-taking era from the input file path.
 
     Args:
         input_path (str): The input file path.
-    
+
     Returns:
         str: Era letter extracted as the third character after "Run20".
 
@@ -78,19 +80,51 @@ def detect_era(input_path: str) -> str:
     """
     run20_index = input_path.find("Run20")
     if run20_index == -1:
-        print("Warning: could not find matching era for data file ", input_path)
+        print("Warning: could not find matching era for data file", input_path)
         print("Returning default era 'D'")
         return "D"
 
     era_index = run20_index + len("Run20") + 2
     if era_index >= len(input_path):
-        print("Warning: input path does not contain an era character at the expected position: ", input_path)
+        print("Warning: input path does not contain an era character at the expected position:", input_path)
         print("Returning default era 'D'")
         return "D"
 
     return input_path[era_index]
 
-def event_selection(options: OptionParser) -> None:
+
+def apply_data_lumi_mask(analyzer: Analyzer, year: str, data_flag: bool) -> None:
+    """
+    Apply the golden JSON lumi mask for data using TIMBER's LumiFilter.
+
+    Compiles LumiFilter.cc (which is part of libtimber), instantiates a global
+    LumiFilter for the given year, and filters events via run/luminosityBlock.
+    This is a no-op for MC.
+
+    Args:
+        analyzer (Analyzer): The Analyzer instance.
+        year (str): Data-taking year (e.g. "2024"). LumiFilter resolves the
+            bundled golden JSON automatically.
+        data_flag (bool): Whether the input is data.
+    """
+    if not data_flag:
+        return
+    ROOT.gInterpreter.Declare(f"LumiFilter lumi_filter({int(year)});") # No need to Compile the module since it is part of libtimber.so
+    analyzer.Define("lumi_pass", "lumi_filter.eval(run, luminosityBlock)")
+    analyzer.Cut("lumi_mask_cut", "lumi_pass==1")
+    print(f"Applied lumi mask for year {year}")
+
+
+def build_cutflow_histogram(labels: list[str], counts: list[Union[int, float]], histogram_name: str, title: str) -> ROOT.TH1F:
+    """Build and fill a cutflow histogram with labeled bins."""
+    histogram = ROOT.TH1F(histogram_name, title, len(labels), 0.5, len(labels) + 0.5)
+    for bin_index, label in enumerate(labels, start=1):
+        histogram.GetXaxis().SetBinLabel(bin_index, label)
+        histogram.SetBinContent(bin_index, counts[bin_index - 1])
+    return histogram
+
+
+def event_preselection(options: OptionParser) -> None:
     """
     Perform event selection
 
@@ -98,123 +132,106 @@ def event_selection(options: OptionParser) -> None:
         options (OptionParser): Command-line options.
     """
     start_time = time.time()
-    a = Analyzer.analyzer(options.input)
-    data_flag = is_data(a)
-    if data_flag:
-        era = detect_era(options.input)
-    else:
-        era = ""
-    n_total = get_n_events(a)
-
-    Common.ApplyMETFilters(a)
-    n_met = get_n_events(a)
+    analyzer = Analyzer.analyzer(options.input)
+    data_flag = is_data(analyzer)
     year = options.year
+    era = detect_era(options.input) if data_flag else ""
+    preselection_cuts = cuts.PRESELECTION_CUTS[year]
+    Common.CompileCpp("TIMBER_modules/JetSelection.cc")  # also loads libtimber.so
 
-    trigger_list = cuts.triggers[year]
-    trigger_string = a.GetTriggerString(trigger_list)
-    a.Cut("Triggers", trigger_string)
-    n_trig = get_n_events(a)
+    n_total = get_n_events(analyzer)
+    n_total_weighted = get_n_weighted(analyzer, data_flag)
 
-    a.Cut("nFatJet","nFatJet > 0")
-    a.Cut("FatJet_pt","FatJet_pt[1] > {}".format(cuts.boosted["pt"]))
+    apply_data_lumi_mask(analyzer, year, data_flag)
+    n_lumi = get_n_events(analyzer)
+    n_lumi_weighted = get_n_weighted(analyzer, data_flag)
 
-    Common.CompileCpp("TIMBER_modules/JetSelection.cc")
-    # Regressed mass should be defined before we undo jet corrections and apply new ones because the rawFactor in NanoAOD matches the JECs used in NanoAOD creation. Otherwise, we would need to fetch rawFactor from the JECs we apply which is more complicated
-    a.Define("FatJet_regressed_mass", "FatJet_globalParT3_massCorrGeneric * FatJet_mass * (1.0 - FatJet_rawFactor)")
-    a.Define("fatjet_indices", "SelectJets(FatJet_pt, FatJet_eta, FatJet_regressed_mass, {}, {}, {})".format(cuts.boosted["pt"], cuts.boosted["eta"], cuts.boosted["m_reg"]))
-    a.Cut("nPassingJets","fatjet_indices.size() > 1")
-    n_jet = get_n_events(a)
+    Common.ApplyMETFilters(analyzer)
+    n_met = get_n_events(analyzer)
+    n_met_weighted = get_n_weighted(analyzer, data_flag)
 
-    #import correctionlib
-    #correctionlib.register_pyroot_binding() 
+    analyzer.Cut("n_FatJet_cut","nFatJet > 1") #Avoids crashing on events with no fatjets
+    n_one_fatjet = get_n_events(analyzer)
+    n_one_fatjet_weighted = get_n_weighted(analyzer, data_flag)
+
+    analyzer.Define("FatJet_regressed_mass", "FatJet_globalParT3_massCorrGeneric * FatJet_mass * (1.0 - FatJet_rawFactor)")
+
     jetid_file = corrections_paths.corrections[year]["JetID"]
     jetveto_file = corrections_paths.corrections[year]["JetVetoMap"]
-    AutoJetID.AutoJetID(a, correction_file = jetid_file, jet_types=["Jet","FatJet"])
-    AutoJME.AutoJME(a, ["Jet", "FatJet"], jec_paths = [corrections_paths.corrections[year]["JEC_AK4"],corrections_paths.corrections[year]["JEC_AK8"]],dataEra=era, verbose = False)
-    AutoJetVetoMap.AutoJetVetoMap(a, campaign = "", map_path = jetveto_file, pt_branch = "Jet_pt_nom", id_branch = "Jet_jetId") 
+    AutoJetID.AutoJetID(analyzer, correction_file=jetid_file, jet_types=["Jet", "FatJet"])
+    AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.corrections[year]["JEC_AK4"], corrections_paths.corrections[year]["JEC_AK8"]], dataEra=era, verbose=False)
+    AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
 
-    #AutoJetID.AutoJetID(a, correction_file = "jetidtest.json.gz")
+    # We use JES__down in MC because it has the lowest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
+    if data_flag:
+        pt_branch_for_selection = "FatJet_pt_nom"
+        jec_variations = ["nom"]
+    else:        
+        pt_branch_for_selection = "FatJet_pt_JES__down"
+        jec_variations = ["nom", "JES__up", "JES__down", "JER__up", "JER__down"]
 
-    a.Define("h_cand_idx", "FatJet_globalParT3_Xbb[fatjet_indices[0]] > FatJet_globalParT3_Xbb[fatjet_indices[1]] ? fatjet_indices[0] : fatjet_indices[1]")
-    a.Define("y_cand_idx", "fatjet_indices[0] == h_cand_idx ? fatjet_indices[1] : fatjet_indices[0]")
-    a.Define("FatJet_mass_h", "FatJet_mass_nom[h_cand_idx]")
-    a.Define("FatJet_mass_y", "FatJet_mass_nom[y_cand_idx]")
-    a.Define("FatJet_pt_h", "FatJet_pt_nom[h_cand_idx]")
-    a.Define("FatJet_pt_y", "FatJet_pt_nom[y_cand_idx]")
-    a.Define("regressed_mass_h", "FatJet_regressed_mass[h_cand_idx]")
-    a.Define("regressed_mass_y", "FatJet_regressed_mass[y_cand_idx]")
+    analyzer.Define(
+        "valid_fatjet_indices",
+        "SelectJets({0}, FatJet_eta, FatJet_regressed_mass, {1}, {2}, {3})".format(
+            pt_branch_for_selection,
+            preselection_cuts["valid_fatjet_pt_min"],
+            preselection_cuts["valid_fatjet_abs_eta_max"],
+            preselection_cuts["valid_fatjet_regressed_mass_min"],
+        ),
+    )
+    analyzer.Define("n_valid_fatjets", "valid_fatjet_indices.size()")
+    analyzer.Cut("two_valid_fatjets", "n_valid_fatjets >= 2")
+    n_two_valid_fatjets = get_n_events(analyzer)
+    n_two_valid_fatjets_weighted = get_n_weighted(analyzer, data_flag)
 
-    a.Define("h_cand_vec", "hardware::TLvector(FatJet_pt_nom[h_cand_idx], FatJet_eta[h_cand_idx], FatJet_phi[h_cand_idx], FatJet_mass_nom[h_cand_idx])") # Check with contacts if this needs to be done with regressed or kinematic mass
-    a.Define("y_cand_vec", "hardware::TLvector(FatJet_pt_nom[y_cand_idx], FatJet_eta[y_cand_idx], FatJet_phi[y_cand_idx], FatJet_mass_nom[y_cand_idx])")
-    a.Define("m_jj", "hardware::InvariantMass({h_cand_vec, y_cand_vec})")
-    a.Cut("m_jj", "m_jj > {}".format(cuts.boosted["m_jj"]))
-    n_mjj = get_n_events(a)
-
-    snapshot_columns = [
-        "run",
-        "luminosityBlock",
-        "event",
-        "nFatJet",
-        "FatJet_pt",
-        "FatJet_pt_nom",
-        "FatJet_pt_jes_up",
-        "FatJet_pt_jes_down",
-        "FatJet_pt_jer_up",
-        "FatJet_pt_jer_down",
-        "FatJet_eta",
-        "FatJet_mass",
-        "FatJet_mass_nom",
-        "FatJet_mass_jes_up",
-        "FatJet_mass_jes_down",
-        "FatJet_mass_jer_up",
-        "FatJet_mass_jer_down",
-        "FatJet_jetId",
-        "fatjet_indices",
+    # FatJet index of the valid fatjet with higher globalParT Xbb score (H candidate)
+    analyzer.Define(
         "h_cand_idx",
+        "FatJet_globalParT3_Xbb[valid_fatjet_indices[0]] > FatJet_globalParT3_Xbb[valid_fatjet_indices[1]] ? valid_fatjet_indices[0] : valid_fatjet_indices[1]",
+    )
+    analyzer.Define(
         "y_cand_idx",
-        "m_jj",
-    ]
+        "valid_fatjet_indices[0] == h_cand_idx ? valid_fatjet_indices[1] : valid_fatjet_indices[0]",
+    )
 
-    # print("Debug preview before Snapshot (first 5 rows):")
-    # debug_columns = ["event", "nFatJet", "FatJet_jetId"]
-    # try:
-    #     a.DataFrame.Display(debug_columns, 5).Print()
-    # except Exception as error:
-    #     print(f"[FAIL] Display({debug_columns}, 5): {error}")
-    #     raise
+    analyzer.Define("h_cand_reg_mass", "FatJet_regressed_mass[h_cand_idx]")
+    analyzer.Define("y_cand_reg_mass", "FatJet_regressed_mass[y_cand_idx]")
 
-    a.Snapshot(snapshot_columns, options.output, "Events", lazy=False, openOption="RECREATE", saveRunChain=True)
+    for jec_variation in jec_variations:
+        analyzer.Define(f"h_cand_pt_{jec_variation}", f"FatJet_pt_{jec_variation}[h_cand_idx]")
+        analyzer.Define(f"h_cand_mass_{jec_variation}", f"FatJet_mass_{jec_variation}[h_cand_idx]")
+        analyzer.Define(f"y_cand_pt_{jec_variation}", f"FatJet_pt_{jec_variation}[y_cand_idx]")
+        analyzer.Define(f"y_cand_mass_{jec_variation}", f"FatJet_mass_{jec_variation}[y_cand_idx]")
+        analyzer.Define(
+            "h_cand_vec_{0}".format(jec_variation),
+            "hardware::TLvector(h_cand_pt_{0}, FatJet_eta[h_cand_idx], FatJet_phi[h_cand_idx], FatJet_mass_{0}[h_cand_idx])".format(jec_variation),
+        )
+        analyzer.Define(
+            "y_cand_vec_{0}".format(jec_variation),
+            "hardware::TLvector(y_cand_pt_{0}, FatJet_eta[y_cand_idx], FatJet_phi[y_cand_idx], FatJet_mass_{0}[y_cand_idx])".format(jec_variation),
+        )
+        analyzer.Define(f"m_jj_{jec_variation}", f"hardware::InvariantMass({{h_cand_vec_{jec_variation}, y_cand_vec_{jec_variation}}})")
 
-    histos = []
+    snapshot_columns = get_preselection_snapshot_columns(year)
 
-    h_mass_H = a.DataFrame.Histo1D(("h_mass_H", ";H-candidate mass [GeV]; Events", 60, 0, 600), "FatJet_mass_h")
-    h_mass_Y = a.DataFrame.Histo1D(("h_mass_Y", ";Y-candidate mass [GeV]; Events", 60, 0, 600), "FatJet_mass_y")
-    h_mjj = a.DataFrame.Histo1D(("h_mjj", ";m_{jj} [GeV]; Events", 60, 0, 3000), "m_jj")
-    h_pt_H = a.DataFrame.Histo1D(("h_pt_H", ";Higgs p_{T} [GeV]; Events", 100, 0, 1000), "FatJet_pt_h")
-    h_pt_Y = a.DataFrame.Histo1D(("h_pt_Y", ";Y p_{T} [GeV]; Events", 100, 0, 1000), "FatJet_pt_y")
-    h_regressed_mass_H = a.DataFrame.Histo1D(("h_regressed_mass_H", ";H-candidate regressed mass [GeV]; Events", 60, 0, 600), "regressed_mass_h")
-    h_regressed_mass_Y = a.DataFrame.Histo1D(("h_regressed_mass_Y", ";Y-candidate regressed mass [GeV]; Events", 60, 0, 600), "regressed_mass_y")
-    
-    # Cutflow histogram
-    cutflow_labels = ["Total", "MET Filters", "Triggers", "Jet selection", "Invariant mass"]
-    h_cutflow = ROOT.TH1F("h_cutflow", "Cutflow; Cut; Events", len(cutflow_labels), 0.5, len(cutflow_labels) + 0.5)
-    for i, label in enumerate(cutflow_labels):
-        h_cutflow.GetXaxis().SetBinLabel(i + 1, label)
-    h_cutflow.SetBinContent(1, n_total)
-    h_cutflow.SetBinContent(2, n_met)
-    h_cutflow.SetBinContent(3, n_trig)
-    h_cutflow.SetBinContent(4, n_jet)
-    h_cutflow.SetBinContent(5, n_mjj)
+    analyzer.Snapshot(snapshot_columns, options.output, "Events", lazy=False, openOption="RECREATE", saveRunChain=True)
 
-    histos.extend([h_mass_H, h_mass_Y, h_mjj, h_pt_H, h_pt_Y, h_regressed_mass_H, h_regressed_mass_Y, h_cutflow])
+    cutflow_labels = ["Total", "Lumi mask", "MET Filters", ">1 fatjets", "Two valid fatjets"]
+    h_cutflow = build_cutflow_histogram(cutflow_labels, [n_total, n_lumi, n_met, n_one_fatjet, n_two_valid_fatjets], "h_cutflow", "Cutflow; Cut; Events")
+    h_cutflow_weighted = build_cutflow_histogram(
+        cutflow_labels,
+        [n_total_weighted, n_lumi_weighted, n_met_weighted, n_one_fatjet_weighted, n_two_valid_fatjets_weighted],
+        "h_cutflow_weighted",
+        "Weighted cutflow; Cut; Weighted events",
+    )
 
     output_file = ROOT.TFile(options.output, "UPDATE")
     output_file.cd()
-    for hist in histos:
-        hist.Write()
+    h_cutflow.Write()
+    h_cutflow_weighted.Write()
     output_file.Close()
-    print(f"Saved histograms to {options.output}")
-    print("Total time: {:.2f} min".format((time.time() - start_time) / 60.))
+    print(f"Saved preselection outputs and cutflow histograms to {options.output}")
+    print("Total time: {:.2f} min".format((time.time() - start_time) / 60.0))
 
 
 parser = OptionParser()
@@ -227,4 +244,4 @@ parser.add_option('-y', '--year', metavar='YEAR', type='string', action='store',
 parser.add_option('-o', '--output', metavar='OFILE', type='string', action='store', default='output.root')
 (options, args) = parser.parse_args()
 
-event_selection(options)
+event_preselection(options)

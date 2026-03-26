@@ -1,0 +1,12 @@
+# Test commands for local development
+
+# --- preselection.py ---
+
+# Signal MC (no lumi mask applied)
+python preselection.py -i filelists/test_files/XToYHto4b_MX1800_MY100_testfile.root -y 2024 -o output_presel_signal.root
+
+# TTbar MC
+python preselection.py -i filelists/test_files/TTTo4Q_testfile.root -y 2024 -o output_presel_ttbar.root
+
+# Data (lumi mask applied automatically)
+python preselection.py -i filelists/test_files/JetMET_Run2024C_testfile.root -y 2024 -o output_presel_data.root
