@@ -1,4 +1,0 @@
-- Setup event selection
-- Setup jet corrections
-- Filelists
-- Condor submission

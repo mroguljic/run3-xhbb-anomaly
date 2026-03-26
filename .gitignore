@@ -4,3 +4,4 @@ __pycache__
 filelists/test_files/
 filelists/__pycache__/
 *root
+testing_scripts

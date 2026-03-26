@@ -8,6 +8,6 @@ triggers = {
 boosted = {
     "pt": 300,
     "eta": 2.4,
-    "m_sd": 40,
+    "m_reg": 40,
     "m_jj": 900
 }
