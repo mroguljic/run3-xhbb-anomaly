@@ -34,11 +34,13 @@ YEAR_EXTRA_COLUMNS: Dict[str, List[str]] = {
 }
 
 
-def get_preselection_snapshot_columns(year: str) -> list[str]:
+def get_preselection_snapshot_columns(year: str, data_flag: bool = False) -> list[str]:
     """Return the flat preselection snapshot branch list for a given year.
 
     Args:
         year (str): Data-taking year string, for example ``"2024"``.
+        data_flag (bool, optional): Whether the sample is data. If True,
+            branches unavailable in data (for example ``genWeight``) are removed.
 
     Returns:
         list[str]: Ordered flat list of branch names to snapshot.
@@ -50,4 +52,7 @@ def get_preselection_snapshot_columns(year: str) -> list[str]:
         supported_years = ", ".join(sorted(YEAR_EXTRA_COLUMNS.keys()))
         raise ValueError(f"Unsupported year '{year}'. Supported years: {supported_years}")
 
-    return COMMON_SNAPSHOT_COLUMNS + YEAR_EXTRA_COLUMNS[year]
+    columns = COMMON_SNAPSHOT_COLUMNS + YEAR_EXTRA_COLUMNS[year]
+    if data_flag:
+        columns = [column for column in columns if column != "genWeight"]
+    return columns

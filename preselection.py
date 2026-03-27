@@ -3,66 +3,14 @@ import time
 from optparse import OptionParser
 from TIMBER.Tools import Common
 from TIMBER import Analyzer
-from typing import Union
 import cuts
 import TIMBER.Tools.AutoJetID as AutoJetID
 import TIMBER.Tools.AutoJetVetoMap as AutoJetVetoMap
 import TIMBER.Tools.AutoJME_correctionlib as AutoJME
+from analysis_utils import get_n_events, get_n_weighted, is_data
 from corrections import corrections_paths
 from preselection_branches import get_preselection_snapshot_columns
-
-
-def get_n_weighted(analyzer: Analyzer, is_data: bool) -> Union[int, float]:
-    """
-    Get the weighted number of events.
-
-    Args:
-        analyzer (Analyzer): The Analyzer instance.
-        is_data (bool): Whether the input is data or MC.
-
-    Returns:
-        Union[int, float]: The weighted number of events.
-    """
-    if not is_data:
-        n_weighted = analyzer.DataFrame.Sum("genWeight").GetValue()
-    else:
-        n_weighted = analyzer.DataFrame.Count().GetValue()
-    return n_weighted
-
-
-def get_n_events(analyzer: Analyzer) -> int:
-    """
-    Get the total number of events.
-
-    Args:
-        analyzer (Analyzer): The Analyzer instance.
-
-    Returns:
-        int: The total number of events.
-    """
-    n_events = analyzer.DataFrame.Count().GetValue()
-    return n_events
-
-
-def is_data(analyzer: Analyzer) -> bool:
-    """
-    Determine if the input is data or MC based on the run number.
-
-    Args:
-        analyzer (Analyzer): The Analyzer instance.
-
-    Returns:
-        bool: True if the input is data, False otherwise.
-    """
-    run_number = analyzer.DataFrame.Range(1).AsNumpy(["run"])  # Check run number to see if data
-    if (run_number["run"][0] > 10000):
-        is_data = True
-        analyzer.Define("genWeight", "1")
-        print("Running on data")
-    else:
-        is_data = False
-        print("Running on MC")
-    return is_data
+from typing import Union
 
 
 def detect_era(input_path: str) -> str:
@@ -134,6 +82,10 @@ def event_preselection(options: OptionParser) -> None:
     start_time = time.time()
     analyzer = Analyzer.analyzer(options.input)
     data_flag = is_data(analyzer)
+    if data_flag:
+        print("Running on data")
+    else:
+        print("Running on MC")
     year = options.year
     era = detect_era(options.input) if data_flag else ""
     preselection_cuts = cuts.PRESELECTION_CUTS[year]
@@ -162,12 +114,12 @@ def event_preselection(options: OptionParser) -> None:
     AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.corrections[year]["JEC_AK4"], corrections_paths.corrections[year]["JEC_AK8"]], dataEra=era, verbose=False)
     AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
 
-    # We use JES__down in MC because it has the lowest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
+    # We use JES__up in MC because it has the highest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
     if data_flag:
         pt_branch_for_selection = "FatJet_pt_nom"
         jec_variations = ["nom"]
     else:        
-        pt_branch_for_selection = "FatJet_pt_JES__down"
+        pt_branch_for_selection = "FatJet_pt_JES__up"
         jec_variations = ["nom", "JES__up", "JES__down", "JER__up", "JER__down"]
 
     analyzer.Define(
