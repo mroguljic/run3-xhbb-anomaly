@@ -1,0 +1,78 @@
+# Condor Submission Framework Configuration
+
+# Batch processing parameters
+batch:
+  # Target number of events per batch (used for grouping files in manifest generation)
+  target_events: 1000000
+
+# File transfer settings
+file_transfer:
+  # Timeout in seconds per file for xrdcp transfer
+  timeout_seconds: 300
+  # Temporary directory on worker node for file staging
+  temp_dir: /tmp
+  # Source XRD endpoint
+  xrd_endpoint: root://cms-xrd-global.cern.ch
+
+# Output directory structure
+output:
+  # Preselection skim outputs (intermediate stage-1 files)
+  skims_dir: output/skims
+  # Template histograms (final stage-2 outputs)
+  templates_dir: output/templates
+  # Bookkeeping and logs
+  bookkeeping_dir: output/bookkeeping
+
+# Condor job settings
+condor:
+  # CPU cores per job
+  cpus_preselection: 1
+  cpus_templating: 1
+  # Memory per job (in MB)
+  memory_preselection_mb: 4000
+  memory_templating_mb: 4000
+  # Disk space per job (in MB)
+  disk_preselection_mb: 10000
+  disk_templating_mb: 5000
+  # Log directory for condor job outputs
+  log_dir: condor/logs
+
+# Dataset filtering (for manifest generation)
+# Leave empty or comment out to process all datasets
+datasets:
+  # Process only specific years (e.g., [2024] or [2023, 2024])
+  # If empty, all years in Nano_v15.py are processed
+  years: []
+  
+  # Process only datasets matching these patterns (substring match on dataset name)
+  # E.g., ["TTbar", "XtoYH"] to process TTbar and signal; empty = all datasets
+  patterns: []
+
+# Retry and recovery settings
+retry:
+  # Number of automatic retries for failed jobs (0 = no retries, manual recovery required)
+  max_retries: 0
+
+# Analysis year (for selection and analysis cuts)
+# Note: actual data year is detected from file paths for data; this is the default for MC
+default_year: 2024
+
+# Logging and debugging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  # Include timing information in job logs
+  include_timing: true
+  # Include memory/disk usage in job logs
+  include_resources: true
+  # Include event counts in job logs
+  include_event_counts: true
+
+# Assumptions and environment
+assumptions:
+  - "Worker nodes have /tmp with at least 10 GB free space per batch"
+  - "TIMBER singularity container available on cluster"
+  - "timber_exec command defined in setup_timber_exec.sh is functional"
+  - "DAS client (dasgoclient) available for file enumeration"
+  - "xrdcp available for file transfer"
+  - "ROOT and Python 3.9+ available in container"
