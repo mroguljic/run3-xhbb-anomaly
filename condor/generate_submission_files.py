@@ -12,25 +12,45 @@ import json
 import argparse
 from pathlib import Path
 from typing import Dict, List
+import yaml
 
 
-def generate_preselection_sub(manifest: Dict, output_file: str, executable: str = "preselection_job.py") -> None:
+def load_user_env(config_path: str = "condor/config.yaml") -> Dict[str, str]:
+    """Load user-specific environment variables from config.yaml."""
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            user_env = config.get('user_env', {})
+            return {
+                'HOME': user_env.get('home', '/users/mrogul'),
+                'X509_USER_PROXY': user_env.get('x509_proxy', 'x509up_u57413')
+            }
+    except FileNotFoundError:
+        print(f"Warning: {config_path} not found. Using default values.")
+        return {'HOME': '/users/mrogul', 'X509_USER_PROXY': 'x509up_u57413'}
+
+
+def generate_preselection_sub(manifest: Dict, output_file: str, executable: str = "condor/preselection_wrapper.sh") -> None:
     """Generate preselection.sub Condor submission file from manifest."""
-    
+
+    # Load user environment variables
+    user_env = load_user_env()
+    home = user_env['HOME']
+    x509_proxy = f"{home}/{user_env['X509_USER_PROXY']}"
+
     lines = [
         "# Preselection job submission file",
         "# Generated from manifest",
         "",
         f"executable = {executable}",
         "request_cpus = 1",
-        "request_memory = 4GB",
-        "request_disk = 10GB",
         "transfer_executable = False",
         "",
         "output = condor/logs/preselection_$(BATCH_ID).out",
         "error = condor/logs/preselection_$(BATCH_ID).err",
         "log = condor/logs/preselection_$(BATCH_ID).log",
         "",
+        f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy}\"",
         "arguments = --batch-id $(BATCH_ID) --manifest condor/manifest.json --year $(YEAR) --output-dir output/skims --log-dir condor/logs",
         "",
         "queue BATCH_ID, YEAR from (",
@@ -61,7 +81,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate Condor submission files from manifest")
     parser.add_argument("--manifest", default="condor/manifest.json", help="Path to manifest JSON")
     parser.add_argument("--output", default="condor/preselection.sub", help="Output .sub file path")
-    parser.add_argument("--executable", default="condor/preselection_job.py", help="Path to executable")
+    parser.add_argument("--executable", default="condor/preselection_wrapper.sh", help="Path to executable")
     
     args = parser.parse_args()
     

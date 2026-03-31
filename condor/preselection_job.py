@@ -126,13 +126,17 @@ def validate_output(output_file: str) -> int:
 
 def run_preselection(merged_file: str, output_file: str, year: str) -> int:
     """
-    Run preselection via singularity.
+    Run preselection inside singularity container.
+    
+    Executes preselection.py through singularity to ensure all dependencies
+    (ROOT, TIMBER) are available.
     
     Returns:
         Event count from validation
     """
     
-    cmd = (
+    # Construct singularity command to run preselection.py
+    singularity_cmd = (
         "singularity exec "
         "--bind \"$(readlink $HOME)\" "
         "--bind /etc/grid-security/certificates "
@@ -140,10 +144,11 @@ def run_preselection(merged_file: str, output_file: str, year: str) -> int:
         "/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/jhu-tools/timber:run3/ "
         f"python3 preselection.py -i {merged_file} -o {output_file} -y {year}"
     )
-    print(f"Running preselection...")
-    print(f"Command: {cmd}")
     
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    print(f"Running preselection...")
+    print(f"Command: {singularity_cmd}")
+    
+    result = subprocess.run(singularity_cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Preselection failed: {result.stderr}")
     

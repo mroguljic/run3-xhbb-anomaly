@@ -76,3 +76,8 @@ assumptions:
   - "DAS client (dasgoclient) available for file enumeration"
   - "xrdcp available for file transfer"
   - "ROOT and Python 3.9+ available in container"
+
+# User-specific environment variables
+user_env:
+  home: /users/mrogul
+  x509_proxy: x509up_u57413
