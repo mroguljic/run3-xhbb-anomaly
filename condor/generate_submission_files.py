@@ -13,7 +13,7 @@ import argparse
 from pathlib import Path
 from typing import Dict, List
 
-from config import USER_ENV
+from config import USER_ENV, OUTPUT, JOB_EXECUTION
 
 
 def generate_preselection_sub(manifest_file: str, output_file: str, executable: str = "condor/preselection_wrapper.sh") -> None:
@@ -25,6 +25,11 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
     x509_proxy = f"{home}/{x509_proxy_filename}"
     manifest = json.load(open(manifest_file))
 
+    # Get paths and working directory from config
+    logs_dir = OUTPUT.get('logs_dir', 'condor/logs')
+    skims_dir = OUTPUT.get('skims_dir', 'output/skims')
+    working_dir = JOB_EXECUTION.get('working_dir', '/users/mrogul/Work/anomaly-tagging/run3-xhbb-anomaly/')
+    
     lines = [
         "# Preselection job submission file",
         "# Generated from manifest",
@@ -33,12 +38,12 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
         "request_cpus = 1",
         "transfer_executable = False",
         "",
-        "output = condor/logs/preselection_$(BATCH_ID).out",
-        "error = condor/logs/preselection_$(BATCH_ID).err",
-        "log = condor/logs/preselection_$(BATCH_ID).log",
+        f"output = {logs_dir}/preselection_$(BATCH_ID).out",
+        f"error = {logs_dir}/preselection_$(BATCH_ID).err",
+        f"log = {logs_dir}/preselection_$(BATCH_ID).log",
         "",
-        f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy}\"",
-        "arguments = --batch-id $(BATCH_ID) --manifest $(MANIFEST_FILE) --year $(YEAR) --output-dir output/skims --log-dir condor/logs",
+        f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy} WORKING_DIR={working_dir}\"",
+        f"arguments = --batch-id $(BATCH_ID) --manifest $(MANIFEST_FILE) --year $(YEAR) --output-dir {skims_dir} --log-dir {logs_dir}",
         "",
         "queue BATCH_ID, YEAR, MANIFEST_FILE from (",
     ]

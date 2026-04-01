@@ -23,7 +23,7 @@ import ROOT
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from condor.config import JOB_EXECUTION
+from condor.config import JOB_EXECUTION, OUTPUT
 
 
 def log_job(batch_id: str, dataset_name: str, year: str, input_files: List[str], 
@@ -178,8 +178,8 @@ def main():
     parser.add_argument("--batch-id", required=True, help="Batch ID from manifest")
     parser.add_argument("--manifest", default="condor/manifest.json", help="Path to manifest JSON")
     parser.add_argument("--year", default="2024", help="Data year")
-    parser.add_argument("--output-dir", default="output/skims", help="Output directory for preselection files")
-    parser.add_argument("--log-dir", default="condor/logs", help="Log directory for metadata JSON")
+    parser.add_argument("--output-dir", default=OUTPUT.get('skims_dir', 'output/skims'), help="Output directory for preselection files")
+    parser.add_argument("--log-dir", default=OUTPUT.get('logs_dir', 'condor/logs'), help="Log directory for metadata JSON")
     
     args = parser.parse_args()
     

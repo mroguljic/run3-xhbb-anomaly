@@ -7,8 +7,8 @@ voms-proxy-info
 
 echo "Running preselection_job.py with arguments: $@"
 
-# Change to working directory
-WORKING_DIR="."
+# Change to working directory (from environment variable, default to current directory)
+WORKING_DIR="${WORKING_DIR:-.}"
 cd "$WORKING_DIR" || exit 1
 echo "Working directory: $(pwd)"
 

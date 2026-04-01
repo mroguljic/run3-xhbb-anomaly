@@ -3,10 +3,13 @@ Condor Submission Framework Configuration
 """
 
 BATCH_TARGET_EVENTS = 1000000
+CAMPAIGN="20260401"
+BASE_STORE_PATH = "/STORE/matej/run3-xhbb-anomaly/"
 
 OUTPUT = {
-    "skims_dir": "output/skims",
-    "templates_dir": "output/templates"
+    "skims_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/skims",
+    "templates_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/templates",
+    "logs_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/logs",
 }
 JOB_EXECUTION = {
     "working_dir": "/users/mrogul/Work/anomaly-tagging/run3-xhbb-anomaly/",  # Jobs will cd here before running, hardcoded in .sh file for now, to be implemented
