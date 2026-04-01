@@ -11,7 +11,7 @@ def list_files_in_dataset(dataset: str) -> List[Tuple[str, int]]:
         dataset (str): The dataset name to query.
 
     Returns:
-        List[Tuple[str, int]]: A list of tuples (file_path, file_size) for files in the dataset.
+        List[Tuple[str, int, int]]: A list of tuples (file_path, file_size, nevents) for files in the dataset.
     """
     try:
         command = f'dasgoclient -query="file dataset={dataset}" -json'
@@ -21,7 +21,7 @@ def list_files_in_dataset(dataset: str) -> List[Tuple[str, int]]:
         file_list = []
         for entry in files:
             for file_info in entry.get('file', []):
-                file_list.append((file_info['name'], file_info['size']))
+                file_list.append((file_info['name'], file_info['size'], file_info['nevents']))
         return file_list
 
     except subprocess.CalledProcessError as e:

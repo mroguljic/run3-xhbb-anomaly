@@ -12,31 +12,18 @@ import json
 import argparse
 from pathlib import Path
 from typing import Dict, List
-import yaml
+
+from config import USER_ENV
 
 
-def load_user_env(config_path: str = "condor/config.yaml") -> Dict[str, str]:
-    """Load user-specific environment variables from config.yaml."""
-    try:
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-            user_env = config.get('user_env', {})
-            return {
-                'HOME': user_env.get('home', '/users/mrogul'),
-                'X509_USER_PROXY': user_env.get('x509_proxy', 'x509up_u57413')
-            }
-    except FileNotFoundError:
-        print(f"Warning: {config_path} not found. Using default values.")
-        return {'HOME': '/users/mrogul', 'X509_USER_PROXY': 'x509up_u57413'}
-
-
-def generate_preselection_sub(manifest: Dict, output_file: str, executable: str = "condor/preselection_wrapper.sh") -> None:
+def generate_preselection_sub(manifest_file: str, output_file: str, executable: str = "condor/preselection_wrapper.sh") -> None:
     """Generate preselection.sub Condor submission file from manifest."""
 
-    # Load user environment variables
-    user_env = load_user_env()
-    home = user_env['HOME']
-    x509_proxy = f"{home}/{user_env['X509_USER_PROXY']}"
+    # Load user environment variables from config
+    home = USER_ENV.get('home', '/users/mrogul')
+    x509_proxy_filename = USER_ENV.get('x509_proxy', 'x509up_u57413')
+    x509_proxy = f"{home}/{x509_proxy_filename}"
+    manifest = json.load(open(manifest_file))
 
     lines = [
         "# Preselection job submission file",
@@ -51,9 +38,9 @@ def generate_preselection_sub(manifest: Dict, output_file: str, executable: str 
         "log = condor/logs/preselection_$(BATCH_ID).log",
         "",
         f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy}\"",
-        "arguments = --batch-id $(BATCH_ID) --manifest condor/manifest.json --year $(YEAR) --output-dir output/skims --log-dir condor/logs",
+        "arguments = --batch-id $(BATCH_ID) --manifest $(MANIFEST_FILE) --year $(YEAR) --output-dir output/skims --log-dir condor/logs",
         "",
-        "queue BATCH_ID, YEAR from (",
+        "queue BATCH_ID, YEAR, MANIFEST_FILE from (",
     ]
     
     # Extract batch info from manifest
@@ -63,7 +50,7 @@ def generate_preselection_sub(manifest: Dict, output_file: str, executable: str 
         for batch in dataset['batches']:
             batch_id = batch['batch_id']
             
-            lines.append(f"  {batch_id}, {year}")
+            lines.append(f"  {batch_id}, {year}, {manifest_file}")
             batch_count += 1
     
     lines.append(")")
@@ -90,7 +77,7 @@ def main():
         manifest = json.load(f)
     
     # Generate submission file
-    batch_count = generate_preselection_sub(manifest, args.output, args.executable)
+    batch_count = generate_preselection_sub(args.manifest, args.output, args.executable)
     print(f"Total batches: {batch_count}")
     print(f"Total events: {manifest['metadata']['total_events']}")
     print(f"Total datasets: {manifest['metadata']['total_datasets']}")

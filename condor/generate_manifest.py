@@ -19,15 +19,17 @@ from typing import Dict, List, Tuple, Any
 # Add parent directory to path so we can import filelists
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import yaml
 from filelists.dataset_utils import list_files_in_dataset
 from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet
+from condor.config import BATCH_TARGET_EVENTS, DATASET_FILTER
 
 
-def load_config(config_path: str = "condor/config.yaml") -> Dict[str, Any]:
-    """Load configuration from YAML file."""
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+def load_config(config_path: str = None) -> Dict[str, Any]:
+    """Load configuration from config.py."""
+    return {
+        'batch': {'target_events': BATCH_TARGET_EVENTS},
+        'datasets': DATASET_FILTER,
+    }
 
 
 def flatten_datasets(mc_bkg_dict: Dict, mc_sig_dict: Dict, jetmet_dict: Dict, 
@@ -145,7 +147,7 @@ def get_file_events(files: List[Tuple[str, int]]) -> List[Tuple[str, int, int]]:
     return result
 
 
-def generate_manifest(config_path: str = "condor/config.yaml", 
+def generate_manifest(config_path: str = "condor/config.py", 
                       year_filter: List[str] = None,
                       pattern_filter: List[str] = None,
                       output_path: str = "condor/manifest.json") -> Dict[str, Any]:
@@ -153,7 +155,7 @@ def generate_manifest(config_path: str = "condor/config.yaml",
     Generate job manifest from datasets.
     
     Args:
-        config_path: Path to config.yaml
+        config_path: Path to config.py
         year_filter: Filter by years (e.g., ["2024"])
         pattern_filter: Filter by dataset name patterns
         output_path: Path to output manifest JSON
@@ -204,15 +206,12 @@ def generate_manifest(config_path: str = "condor/config.yaml",
             print("  [skip] No files found")
             continue
         
-        print(f"  Found {len(files)} files, {sum(s for _, s in files) / 1e9:.2f} GB")
-        
-        # Get event counts
-        files_with_events = get_file_events(files)
-        total_dataset_events = sum(nevents for _, _, nevents in files_with_events)
-        total_dataset_size = sum(size for _, size, _ in files_with_events)
+        print(f"  Found {len(files)} files, {sum(s for _, s, _ in files) / 1e9:.2f} GB")
+        total_dataset_events = sum(nevents for _, _, nevents in files)
+        total_dataset_size = sum(size for _, size, _ in files)
         
         # Batch files
-        batches = batch_files_by_events(files_with_events, batch_target_events)
+        batches = batch_files_by_events(files, batch_target_events)
         print(f"  Grouped into {len(batches)} batches")
         
         # Build dataset entry
@@ -229,8 +228,8 @@ def generate_manifest(config_path: str = "condor/config.yaml",
         
         for batch_idx, batch_files in enumerate(batches):
             batch_id = f"{dataset_name}_{batch_idx}"
-            batch_events = sum(nevents for path, size, nevents in files_with_events if path in batch_files)
-            batch_size = sum(size for path, size, nevents in files_with_events if path in batch_files)
+            batch_events = sum(nevents for path, size, nevents in files if path in batch_files)
+            batch_size = sum(size for path, size, nevents in files if path in batch_files)
             
             batch_entry = {
                 "batch_id": batch_id,

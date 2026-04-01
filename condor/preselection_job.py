@@ -23,6 +23,8 @@ import ROOT
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from condor.config import JOB_EXECUTION
+
 
 def log_job(batch_id: str, dataset_name: str, year: str, input_files: List[str], 
             output_path: str, status: str, events: int = 0, error_msg: str = None,
@@ -52,43 +54,49 @@ def log_job(batch_id: str, dataset_name: str, year: str, input_files: List[str],
     print(f"Logged to {log_file}")
 
 
-def download_file(file_path: str, dest_dir: str) -> str:
-    """Download file via xrdcp, return local path."""
+def copy_files_local(file_paths: List[str], dest_dir: str) -> List[str]:
+    """Copy files from storage to local directory using xrdcp.
     
-    # Construct full XRD URL if needed
-    if not file_path.startswith("root://"):
-        file_path = f"root://cms-xrd-global.cern.ch/{file_path}"
+    Returns:
+        List of local file paths
+    """
+    local_files = []
     
-    dest_file = Path(dest_dir) / Path(file_path).name
+    for i, file_path in enumerate(file_paths, 1):
+        # Construct full XRD URL if needed
+        if not file_path.startswith("root://"):
+            file_path = f"root://cms-xrd-global.cern.ch/{file_path}"
+        
+        local_filename = Path(file_path).name
+        local_path = Path(dest_dir) / local_filename
+        
+        cmd = f"xrdcp '{file_path}' '{local_path}'"
+        print(f"[{i}/{len(file_paths)}] Copying: {local_filename}")
+        
+        result = subprocess.run(cmd, shell=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"xrdcp failed for {file_path}: {result.stderr}")
+        
+        local_files.append(str(local_path))
     
-    cmd = f"xrdcp '{file_path}' '{dest_file}'"
-    print(f"Downloading: {file_path}")
-    
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"xrdcp failed: {result.stderr}")
-    
-    return str(dest_file)
+    return local_files
 
 
-def merge_files(input_files: List[str], output_file: str) -> None:
-    """Merge multiple ROOT files using hadd."""
+def create_filelist_txt(file_paths: List[str], output_file: str) -> str:
+    """Create a .txt file containing line-separated file paths for TIMBER Analyzer.
     
-    if len(input_files) == 1:
-        # Single file, no merge needed
-        import shutil
-        shutil.copy(input_files[0], output_file)
-        print(f"Copied single file to {output_file}")
-        return
+    The Analyzer can accept a .txt file with file paths, which it will chain together
+    without needing external hadding.
     
-    cmd = f"hadd -f {output_file} " + " ".join(input_files)
-    print(f"Merging {len(input_files)} files...")
+    Returns:
+        Path to the created .txt file
+    """
+    with open(output_file, 'w') as f:
+        for file_path in file_paths:
+            f.write(file_path + '\n')
     
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"hadd failed: {result.stderr}")
-    
-    print(f"Merged to {output_file}")
+    print(f"Created filelist: {output_file} with {len(file_paths)} files")
+    return output_file
 
 
 def validate_output(output_file: str) -> int:
@@ -124,31 +132,22 @@ def validate_output(output_file: str) -> int:
         raise RuntimeError(f"Output validation failed: {e}")
 
 
-def run_preselection(merged_file: str, output_file: str, year: str) -> int:
+def run_preselection(filelist_txt: str, output_file: str, year: str) -> int:
     """
-    Run preselection inside singularity container.
+    Run preselection.py directly (assumed that we are inside singularity container).
     
-    Executes preselection.py through singularity to ensure all dependencies
-    (ROOT, TIMBER) are available.
+    The filelist_txt is passed to the Analyzer, which chains the files together internally.
     
     Returns:
         Event count from validation
     """
     
-    # Construct singularity command to run preselection.py
-    singularity_cmd = (
-        "singularity exec "
-        "--bind \"$(readlink $HOME)\" "
-        "--bind /etc/grid-security/certificates "
-        "--bind /cvmfs "
-        "/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/jhu-tools/timber:run3/ "
-        f"python3 preselection.py -i {merged_file} -o {output_file} -y {year}"
-    )
+    cmd = f"python3 preselection.py -i {filelist_txt} -o {output_file} -y {year}"
     
     print(f"Running preselection...")
-    print(f"Command: {singularity_cmd}")
+    print(f"Command: {cmd}")
     
-    result = subprocess.run(singularity_cmd, shell=True, capture_output=True, text=True)
+    result = subprocess.run(cmd, shell=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Preselection failed: {result.stderr}")
     
@@ -181,9 +180,11 @@ def main():
     parser.add_argument("--year", default="2024", help="Data year")
     parser.add_argument("--output-dir", default="output/skims", help="Output directory for preselection files")
     parser.add_argument("--log-dir", default="condor/logs", help="Log directory for metadata JSON")
-    parser.add_argument("--temp-dir", default="/tmp", help="Temporary directory for file staging")
     
     args = parser.parse_args()
+    
+    # Load configuration from config.py
+    temp_base_dir = JOB_EXECUTION.get('temp_base_dir', '/tmp')
     
     start_time = time.time()
     
@@ -205,27 +206,21 @@ def main():
         print(f"Dataset: {dataset_name}")
         print(f"Files: {len(input_files)}")
         
-        # Create temp work directory with unique job ID to avoid conflicts on shared filesystem
-        # Use Condor cluster and proc IDs if available, otherwise use timestamp
-        cluster_id = os.environ.get('CONDOR_CLUSTER', 'local')
-        proc_id = os.environ.get('CONDOR_PROC', '0')
-        job_id = f"{cluster_id}_{proc_id}"
-        
-        work_dir = Path(args.temp_dir) / f"batch_{args.batch_id}_{job_id}"
-        work_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Work directory: {work_dir}")
+        # Create unique temporary directory for this batch
+        temp_dir = Path(temp_base_dir) / f"preselection_{args.batch_id}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Temporary directory: {temp_dir}")
         
         try:
-            # Download files
-            print(f"Downloading {len(input_files)} files...")
-            downloaded = []
-            for file_path in input_files:
-                local_path = download_file(file_path, str(work_dir))
-                downloaded.append(local_path)
+            # Copy files locally for faster read performance
+            print(f"Copying {len(input_files)} files to local staging directory...")
+            local_files = copy_files_local(input_files, str(temp_dir))
             
-            # Merge if multiple files
-            merged_file = work_dir / f"merged_{args.batch_id}.root"
-            merge_files(downloaded, str(merged_file))
+            # Create filelist with local paths
+            # TIMBER Analyzer can accept a .txt file with file paths and chain them internally
+            # Much faster than using network processing in TChain
+            filelist_path = temp_dir / f"filelist_{args.batch_id}.txt"
+            create_filelist_txt(local_files, str(filelist_path))
             
             # Run preselection
             Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -254,7 +249,7 @@ def main():
                 print(f"Job skipped (already exists) in {end_time - start_time:.1f} seconds")
                 return
             
-            events = run_preselection(str(merged_file), str(output_file), args.year)
+            events = run_preselection(str(filelist_path), str(output_file), args.year)
             
             # Success
             end_time = time.time()
@@ -271,16 +266,16 @@ def main():
                 log_dir=args.log_dir
             )
             print(f"Job completed successfully in {end_time - start_time:.1f} seconds")
-            
+        
         finally:
-            # Cleanup temp directory and all files
+            # Clean up temporary directory
+            print(f"Cleaning up temporary directory: {temp_dir}")
             import shutil
-            if work_dir.exists():
-                try:
-                    shutil.rmtree(work_dir)
-                    print(f"Cleaned up {work_dir}")
-                except Exception as cleanup_err:
-                    print(f"WARNING: Failed to cleanup {work_dir}: {cleanup_err}", file=sys.stderr)
+            try:
+                shutil.rmtree(temp_dir)
+                print(f"Removed {temp_dir}")
+            except Exception as cleanup_err:
+                print(f"Warning: Failed to clean up {temp_dir}: {cleanup_err}", file=sys.stderr)
     
     except Exception as e:
         end_time = time.time()

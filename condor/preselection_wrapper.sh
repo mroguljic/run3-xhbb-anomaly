@@ -7,6 +7,11 @@ voms-proxy-info
 
 echo "Running preselection_job.py with arguments: $@"
 
+# Change to working directory
+WORKING_DIR="."
+cd "$WORKING_DIR" || exit 1
+echo "Working directory: $(pwd)"
+
 singularity exec \
     --bind "$(readlink $HOME)" \
     --bind /etc/grid-security/certificates \
