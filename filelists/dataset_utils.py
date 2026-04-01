@@ -22,6 +22,8 @@ def list_files_in_dataset(dataset: str) -> List[Tuple[str, int]]:
         for entry in files:
             for file_info in entry.get('file', []):
                 file_list.append((file_info['name'], file_info['size'], file_info['nevents']))
+        # Sort by filename for reproducible ordering
+        file_list.sort(key=lambda x: x[0])
         return file_list
 
     except subprocess.CalledProcessError as e:
