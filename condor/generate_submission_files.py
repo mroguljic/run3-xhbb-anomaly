@@ -12,7 +12,7 @@ import json
 import argparse
 from pathlib import Path
 from typing import Dict, List
-
+import os
 from config import USER_ENV, OUTPUT, JOB_EXECUTION
 
 
@@ -29,6 +29,9 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
     logs_dir = OUTPUT.get('logs_dir', 'condor/logs')
     skims_dir = OUTPUT.get('skims_dir', 'output/skims')
     working_dir = JOB_EXECUTION.get('working_dir', '/users/mrogul/Work/anomaly-tagging/run3-xhbb-anomaly/')
+
+    os.makedirs(logs_dir, exist_ok=True)
+    os.makedirs(skims_dir, exist_ok=True)
     
     lines = [
         "# Preselection job submission file",
@@ -48,15 +51,21 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
         "queue BATCH_ID, YEAR, MANIFEST_FILE from (",
     ]
     
-    # Extract batch info from manifest
+    # Extract batch info from manifest and filter to only queue batches with missing output
     batch_count = 0
+    skipped_count = 0
     for dataset in manifest['datasets']:
         year = dataset['year']
         for batch in dataset['batches']:
             batch_id = batch['batch_id']
+            output_file_path = Path(skims_dir) / f"preselection_{batch_id}.root"
             
-            lines.append(f"  {batch_id}, {year}, {manifest_file}")
-            batch_count += 1
+            if output_file_path.exists():
+                print(f"Skipping {batch_id} (output already exists)")
+                skipped_count += 1
+            else:
+                lines.append(f"  {batch_id}, {year}, {manifest_file}")
+                batch_count += 1
     
     lines.append(")")
     lines.append("")
@@ -65,7 +74,7 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
     with open(output_file, 'w') as f:
         f.write('\n'.join(lines))
     
-    print(f"Generated {output_file} with {batch_count} jobs")
+    print(f"Generated {output_file} with {batch_count} jobs (skipped {skipped_count} with existing output)")
     return batch_count
 
 
@@ -83,9 +92,10 @@ def main():
     
     # Generate submission file
     batch_count = generate_preselection_sub(args.manifest, args.output, args.executable)
-    print(f"Total batches: {batch_count}")
-    print(f"Total events: {manifest['metadata']['total_events']}")
-    print(f"Total datasets: {manifest['metadata']['total_datasets']}")
+    print(f"\nSummary:")
+    print(f"  Jobs queued: {batch_count}")
+    print(f"  Total events: {manifest['metadata']['total_events']}")
+    print(f"  Total datasets: {manifest['metadata']['total_datasets']}")
     
     # Print sample
     print("\nFirst 20 lines of generated file:")

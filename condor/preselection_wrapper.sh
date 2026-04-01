@@ -16,5 +16,6 @@ singularity exec \
     --bind "$(readlink $HOME)" \
     --bind /etc/grid-security/certificates \
     --bind /cvmfs \
+    --bind /STORE \
     /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/jhu-tools/timber:run3/ \
     python3 condor/preselection_job.py "$@"

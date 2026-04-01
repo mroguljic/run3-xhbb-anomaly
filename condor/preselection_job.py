@@ -212,20 +212,9 @@ def main():
         print(f"Temporary directory: {temp_dir}")
         
         try:
-            # Copy files locally for faster read performance
-            print(f"Copying {len(input_files)} files to local staging directory...")
-            local_files = copy_files_local(input_files, str(temp_dir))
-            
-            # Create filelist with local paths
-            # TIMBER Analyzer can accept a .txt file with file paths and chain them internally
-            # Much faster than using network processing in TChain
-            filelist_path = temp_dir / f"filelist_{args.batch_id}.txt"
-            create_filelist_txt(local_files, str(filelist_path))
-            
             # Run preselection
             Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             output_file = Path(args.output_dir) / f"preselection_{args.batch_id}.root"
-            
             # Skip if output already exists (safe resume)
             if output_file.exists():
                 print(f"Output already exists: {output_file}")
@@ -249,6 +238,17 @@ def main():
                 print(f"Job skipped (already exists) in {end_time - start_time:.1f} seconds")
                 return
             
+
+            # Copy files locally for faster read performance
+            print(f"Copying {len(input_files)} files to local staging directory...")
+            local_files = copy_files_local(input_files, str(temp_dir))
+            
+            # Create filelist with local paths
+            # TIMBER Analyzer can accept a .txt file with file paths and chain them internally
+            # Much faster than using network processing in TChain
+            filelist_path = temp_dir / f"filelist_{args.batch_id}.txt"
+            create_filelist_txt(local_files, str(filelist_path))
+
             events = run_preselection(str(filelist_path), str(output_file), args.year)
             
             # Success

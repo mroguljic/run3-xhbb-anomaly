@@ -4,7 +4,7 @@ Condor Submission Framework Configuration
 
 BATCH_TARGET_EVENTS = 1000000
 CAMPAIGN="20260401"
-BASE_STORE_PATH = "/STORE/matej/run3-xhbb-anomaly/"
+BASE_STORE_PATH = "/STORE/matej/run3-xhbb-anomaly"
 
 OUTPUT = {
     "skims_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/skims",
