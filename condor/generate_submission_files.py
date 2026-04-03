@@ -45,7 +45,7 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
         f"error = {logs_dir}/preselection_$(BATCH_ID).err",
         f"log = {logs_dir}/preselection_$(BATCH_ID).log",
         "",
-        f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy} WORKING_DIR={working_dir}\"",
+        f"environment = \"HOME={home} X509_USER_PROXY={x509_proxy}\"",
         f"arguments = --batch-id $(BATCH_ID) --manifest $(MANIFEST_FILE) --year $(YEAR) --output-dir {skims_dir} --log-dir {logs_dir}",
         "",
         "queue BATCH_ID, YEAR, MANIFEST_FILE from (",

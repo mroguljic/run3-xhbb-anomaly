@@ -186,6 +186,11 @@ def main():
     # Load configuration from config.py
     temp_base_dir = JOB_EXECUTION.get('temp_base_dir', '/tmp')
     
+    # Use Condor scratch directory if available (local to compute node, faster than network)
+    if os.environ.get('_CONDOR_SCRATCH_DIR'):
+        temp_base_dir = os.environ.get('_CONDOR_SCRATCH_DIR')
+        print(f"Using Condor scratch directory: {temp_base_dir}")
+    
     start_time = time.time()
     
     try:
