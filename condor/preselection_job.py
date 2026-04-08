@@ -158,6 +158,30 @@ def run_preselection(filelist_txt: str, output_file: str, year: str) -> int:
     return events
 
 
+def copy_output_to_storage(local_output: str, remote_output: str) -> None:
+    """Copy ROOT output file from local staging to STORE (lorien server)
+    
+    Args:
+        local_output: Path to local output file in scratch directory
+        remote_output: Path to remote output file on /STORE 
+    """
+    # Ensure remote directory exists
+    remote_dir = Path(remote_output).parent
+    remote_dir.mkdir(parents=True, exist_ok=True)
+    
+    cmd = f"cp '{local_output}' '{remote_output}'"
+    
+    print(f"Copying output file to storage...")
+    print(f"Local: {local_output}")
+    print(f"Remote: {remote_output}")
+    
+    result = subprocess.run(cmd, shell=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to copy output to storage: {result.stderr}")
+    
+    print(f"Output file successfully copied to {remote_output}")
+
+
 def find_batch_in_manifest(batch_id: str, manifest: Dict) -> Dict:
     """Find batch definition in manifest."""
     
@@ -183,13 +207,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Load configuration from config.py
-    temp_base_dir = JOB_EXECUTION.get('temp_base_dir', '/tmp')
-    
-    # Use Condor scratch directory if available (local to compute node, faster than network)
-    if os.environ.get('_CONDOR_SCRATCH_DIR'):
-        temp_base_dir = os.environ.get('_CONDOR_SCRATCH_DIR')
-        print(f"Using Condor scratch directory: {temp_base_dir}")
+    # Use Condor scratch directory for staging input files (local to compute node, faster than network)
+    working_dir = os.environ.get('_CONDOR_SCRATCH_DIR')
+    if not working_dir:
+        raise RuntimeError("_CONDOR_SCRATCH_DIR environment variable not set. This job must run under Condor.")
+    print(f"Using Condor scratch directory: {working_dir}")
     
     start_time = time.time()
     
@@ -211,76 +233,71 @@ def main():
         print(f"Dataset: {dataset_name}")
         print(f"Files: {len(input_files)}")
         
-        # Create unique temporary directory for this batch
-        temp_dir = Path(temp_base_dir) / f"preselection_{args.batch_id}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Temporary directory: {temp_dir}")
+        # Use scratch directory subdirectory for staging input files
+        staging_dir = Path(working_dir) / f"preselection_{args.batch_id}"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Staging directory: {staging_dir}")
         
-        try:
-            # Run preselection
-            Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-            output_file = Path(args.output_dir) / f"preselection_{args.batch_id}.root"
-            # Skip if output already exists (safe resume)
-            if output_file.exists():
-                print(f"Output already exists: {output_file}")
-                print("Skipping preselection (job already completed)")
-                # Validate existing output and get event count
-                events = validate_output(str(output_file))
-                # Log as success
-                end_time = time.time()
-                log_job(
-                    batch_id=args.batch_id,
-                    dataset_name=dataset_name,
-                    year=args.year,
-                    input_files=input_files,
-                    output_path=str(output_file),
-                    status="skipped_already_exists",
-                    events=events,
-                    start_time=start_time,
-                    end_time=end_time,
-                    log_dir=args.log_dir
-                )
-                print(f"Job skipped (already exists) in {end_time - start_time:.1f} seconds")
-                return
-            
-
-            # Copy files locally for faster read performance
-            print(f"Copying {len(input_files)} files to local staging directory...")
-            local_files = copy_files_local(input_files, str(temp_dir))
-            
-            # Create filelist with local paths
-            # TIMBER Analyzer can accept a .txt file with file paths and chain them internally
-            # Much faster than using network processing in TChain
-            filelist_path = temp_dir / f"filelist_{args.batch_id}.txt"
-            create_filelist_txt(local_files, str(filelist_path))
-
-            events = run_preselection(str(filelist_path), str(output_file), args.year)
-            
-            # Success
+        # Remote output path on /STORE
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        remote_output_file = Path(args.output_dir) / f"preselection_{args.batch_id}.root"
+        
+        # Skip if output already exists on remote storage (safe resume)
+        if remote_output_file.exists():
+            print(f"Output already exists: {remote_output_file}")
+            print("Skipping preselection (job already completed)")
+            # Validate existing output and get event count
+            events = validate_output(str(remote_output_file))
+            # Log as success
             end_time = time.time()
             log_job(
                 batch_id=args.batch_id,
                 dataset_name=dataset_name,
                 year=args.year,
                 input_files=input_files,
-                output_path=str(output_file),
-                status="success",
+                output_path=str(remote_output_file),
+                status="skipped_already_exists",
                 events=events,
                 start_time=start_time,
                 end_time=end_time,
                 log_dir=args.log_dir
             )
-            print(f"Job completed successfully in {end_time - start_time:.1f} seconds")
+            print(f"Job skipped (already exists) in {end_time - start_time:.1f} seconds")
+            return
         
-        finally:
-            # Clean up temporary directory
-            print(f"Cleaning up temporary directory: {temp_dir}")
-            import shutil
-            try:
-                shutil.rmtree(temp_dir)
-                print(f"Removed {temp_dir}")
-            except Exception as cleanup_err:
-                print(f"Warning: Failed to clean up {temp_dir}: {cleanup_err}", file=sys.stderr)
+
+        # Copy files locally for faster read performance
+        print(f"Copying {len(input_files)} files to local staging directory...")
+        local_files = copy_files_local(input_files, str(staging_dir))
+        
+        # Create filelist with local paths
+        # TIMBER Analyzer can accept a .txt file with file paths and chain them internally
+        # Much faster than using network processing in TChain
+        filelist_path = staging_dir / f"filelist_{args.batch_id}.txt"
+        create_filelist_txt(local_files, str(filelist_path))
+
+        # Run preselection and write output to local scratch disk (faster I/O)
+        local_output_file = staging_dir / f"preselection_{args.batch_id}.root"
+        events = run_preselection(str(filelist_path), str(local_output_file), args.year)
+        
+        # Copy output file to remote storage on /STORE
+        copy_output_to_storage(str(local_output_file), str(remote_output_file))
+        
+        # Success
+        end_time = time.time()
+        log_job(
+            batch_id=args.batch_id,
+            dataset_name=dataset_name,
+            year=args.year,
+            input_files=input_files,
+            output_path=str(remote_output_file),
+            status="success",
+            events=events,
+            start_time=start_time,
+            end_time=end_time,
+            log_dir=args.log_dir
+        )
+        print(f"Job completed successfully in {end_time - start_time:.1f} seconds")
     
     except Exception as e:
         end_time = time.time()

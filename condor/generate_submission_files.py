@@ -39,7 +39,7 @@ def generate_preselection_sub(manifest_file: str, output_file: str, executable: 
         "",
         f"executable = {executable}",
         "request_cpus = 1",
-        "transfer_executable = False",
+        "transfer_executable = True",
         f"transfer_input_files = timber_run3.sif,{manifest_file}",
         "should_transfer_files = YES",
         "",
