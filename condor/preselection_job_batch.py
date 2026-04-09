@@ -35,6 +35,8 @@ from typing import List, Dict, Any
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from condor.config import get_store_xrd_path
+
 
 # ============================================================================
 # Logging and Metadata
@@ -102,7 +104,7 @@ def stage_input_files(file_paths: List[str], staging_dir: str) -> List[str]:
     Copy files from storage to local staging directory using xrdcp.
     
     Args:
-        file_paths: List of XRD file paths (root://... URLs)
+        file_paths: List of /store file paths
         staging_dir: Local directory to stage files in
     
     Returns:
@@ -117,7 +119,10 @@ def stage_input_files(file_paths: List[str], staging_dir: str) -> List[str]:
         local_filename = Path(file_path).name
         local_path = Path(staging_dir) / local_filename
         
-        cmd = f"xrdcp '{file_path}' '{local_path}'"
+        # Convert /store path to XRD URL
+        xrd_path = get_store_xrd_path(file_path)
+        
+        cmd = f"xrdcp '{xrd_path}' '{local_path}'"
         print(f"[{i}/{len(file_paths)}] Copying: {local_filename}")
         
         print(cmd)
