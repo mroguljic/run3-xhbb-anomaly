@@ -120,9 +120,11 @@ def stage_input_files(file_paths: List[str], staging_dir: str) -> List[str]:
         cmd = f"xrdcp '{file_path}' '{local_path}'"
         print(f"[{i}/{len(file_paths)}] Copying: {local_filename}")
         
+        print(cmd)
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         if result.returncode != 0:
             error = result.stderr or result.stdout
+            print f"ERROR copying {file_path}:\n{error}"
             raise RuntimeError(f"Failed to copy {file_path}:\n{error}")
         
         # Verify file was copied

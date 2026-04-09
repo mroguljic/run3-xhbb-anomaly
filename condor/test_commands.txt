@@ -1,0 +1,3 @@
+cd condor
+python3 generate_batches.py  --datasets QCD-4Jets_HT-800to1000 --year 2024  --output manifest_qcd_test.json
+python3 generate_submission.py --manifest manifest_qcd_test.json --output submission.sub

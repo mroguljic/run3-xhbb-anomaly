@@ -50,6 +50,14 @@ echo "Repository cloned successfully"
 echo "Commit hash: ${COMMIT_HASH}"
 echo ""
 
+# Copy manifest JSON from job's working directory to repo
+MANIFEST_FILE="${@: -1}"
+if [[ -f "${SCRATCH_DIR}/${MANIFEST_FILE}" ]]; then
+    cp "${SCRATCH_DIR}/${MANIFEST_FILE}" "${REPO_DIR}/${MANIFEST_FILE}"
+    echo "Copied manifest: ${MANIFEST_FILE}"
+fi
+echo ""
+
 # ============================================================================
 # Run preselection job
 # ============================================================================
