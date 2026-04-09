@@ -2,6 +2,8 @@
 """
 Phase 2: Preselection job executor for HTCondor batches.
 
+Reads batch metadata from a manifest JSON file and executes preselection.
+
 Handles:
   - Input file copying (xrdcp to local scratch)
   - Preselection execution
@@ -11,13 +13,12 @@ Handles:
 Usage:
     python3 preselection_job_batch.py \
         --batch-id TTto4Q_batch_0 \
-        --files root://path/file1.root root://path/file2.root \
-        --year 2024 \
-        --output /STORE/matej/run3-xhbb-anomaly/skims/preselection_TTto4Q_batch_0.root
+        --manifest-path manifest.json
 
 Environment:
     Assumes TIMBER environment is available (loaded in container)
     Assumes preselection.py exists in parent directory
+    Assumes manifest.json is in current directory or specified path
 """
 
 import json
@@ -100,11 +101,8 @@ def stage_input_files(file_paths: List[str], staging_dir: str) -> List[str]:
     """
     Copy files from storage to local staging directory using xrdcp.
     
-    If a file is already a local path (doesn't start with root://), copy it directly.
-    Otherwise use xrdcp for remote files.
-    
     Args:
-        file_paths: List of file paths (can be local or XRD URLs)
+        file_paths: List of XRD file paths (root://... URLs)
         staging_dir: Local directory to stage files in
     
     Returns:
@@ -119,16 +117,8 @@ def stage_input_files(file_paths: List[str], staging_dir: str) -> List[str]:
         local_filename = Path(file_path).name
         local_path = Path(staging_dir) / local_filename
         
-        # If file is already local, just copy it
-        if not file_path.startswith("root://"):
-            if not Path(file_path).exists():
-                raise RuntimeError(f"Local file not found: {file_path}")
-            cmd = f"cp '{file_path}' '{local_path}'"
-            print(f"[{i}/{len(file_paths)}] Copying local: {local_filename}")
-        else:
-            # Use xrdcp for remote files
-            cmd = f"xrdcp '{file_path}' '{local_path}'"
-            print(f"[{i}/{len(file_paths)}] Copying remote: {local_filename}")
+        cmd = f"xrdcp '{file_path}' '{local_path}'"
+        print(f"[{i}/{len(file_paths)}] Copying: {local_filename}")
         
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         if result.returncode != 0:
@@ -263,30 +253,20 @@ def validate_output_file(output_file: str) -> int:
 
 def transfer_output_to_store(local_output: str, remote_output: str) -> None:
     """
-    Transfer output ROOT file from local scratch to /STORE.
-    
-    Uses xrdcp if remote path is XRD URL, otherwise uses cp.
+    Transfer output ROOT file from local scratch to /STORE using xrdcp.
     
     Args:
         local_output: Path to output file in local scratch
-        remote_output: Path to output file on /STORE
+        remote_output: XRD URL to output file on /STORE (root://cmseos.fnal.gov/store/...)
     
     Raises:
         RuntimeError: If transfer fails
     """
-    # Ensure remote directory exists
-    remote_dir = Path(remote_output).parent
-    if not str(remote_dir).startswith("root://"):
-        remote_dir.mkdir(parents=True, exist_ok=True)
+    if not str(remote_output).startswith("root://"):
+        raise ValueError(f"Remote output must be XRD URL, got: {remote_output}")
     
-    # Choose transfer method based on path
-    if str(remote_output).startswith("root://"):
-        cmd = f"xrdcp '{local_output}' '{remote_output}'"
-        print(f"Transferring via xrdcp...")
-    else:
-        cmd = f"cp '{local_output}' '{remote_output}'"
-        print(f"Transferring via cp...")
-    
+    cmd = f"xrdcp '{local_output}' '{remote_output}'"
+    print(f"Transferring via xrdcp...")
     print(f"Local:  {local_output}")
     print(f"Remote: {remote_output}\n")
     
@@ -295,15 +275,7 @@ def transfer_output_to_store(local_output: str, remote_output: str) -> None:
         error = result.stderr or result.stdout
         raise RuntimeError(f"Transfer failed:\n{error}")
     
-    # Verify transfer
-    if str(remote_output).startswith("root://"):
-        print(f"Output transferred to {remote_output} (XRD)")
-    else:
-        if Path(remote_output).exists():
-            size_mb = Path(remote_output).stat().st_size / (1024 * 1024)
-            print(f"Output transferred to {remote_output} ({size_mb:.1f} MB)")
-        else:
-            raise RuntimeError(f"Transfer verification failed: {remote_output} not found")
+    print(f"Output transferred to {remote_output}")
 
 
 # ============================================================================
@@ -316,77 +288,72 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Single file
   python3 preselection_job_batch.py \\
-      --batch-id batch_0 \\
-      --files root://path/file1.root \\
-      --year 2024 \\
-      --output /STORE/path/preselection_batch_0.root
+      --batch-id TTto4Q_batch_0 \\
+      --manifest manifest.json
 
-  # Multiple files (space-separated)
   python3 preselection_job_batch.py \\
-      --batch-id batch_1 \\
-      --files root://path/file1.root root://path/file2.root root://path/file3.root \\
-      --year 2024 \\
-      --output /STORE/path/preselection_batch_1.root
+      --batch-id QCD-4Jets_HT-800to1000_batch_2 \\
+      --manifest /path/to/manifest_20260401.json
         """
     )
-    parser.add_argument("--batch-id", required=True, help="Unique batch identifier")
-    parser.add_argument("--files", nargs="+", required=True, help="Input files (can be local or XRD URLs)")
-    parser.add_argument("--year", required=True, help="Data year (e.g., 2024)")
-    parser.add_argument("--output", required=True, help="Output ROOT file path")
+    parser.add_argument("--batch-id", required=True, help="Unique batch identifier (from manifest)")
+    parser.add_argument("--manifest", required=True, help="Path to batch manifest JSON file")
     
     args = parser.parse_args()
     
     batch_id = args.batch_id
-    input_files = args.files
-    year = args.year
-    output_path = args.output
+    manifest_path = args.manifest
     
-    # Extract dataset name from batch ID (assumed format: DATASET_batch_N or DATASET_YEAR_batch_N)
-    dataset_name = "_".join(batch_id.split("_")[:-2]) or batch_id
+    # Load manifest
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+    except FileNotFoundError:
+        print(f"ERROR: Manifest file not found: {manifest_path}")
+        return 1
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Failed to parse manifest: {e}")
+        return 1
+    
+    # Find batch in manifest (search all datasets)
+    batch = None
+    dataset_name = None
+    
+    for ds_name, dataset_info in manifest["datasets"].items():
+        if batch_id in dataset_info["batches"]:
+            batch = dataset_info["batches"][batch_id]
+            dataset_name = ds_name
+            break
+    
+    if batch is None:
+        print(f"ERROR: Batch '{batch_id}' not found in manifest")
+        available_batches = []
+        for ds_name, dataset_info in manifest["datasets"].items():
+            available_batches.extend(dataset_info["batches"].keys())
+        print(f"Available batches: {', '.join(sorted(available_batches))}")
+        return 1
+    
+    input_files = batch["files"]
+    year = manifest["year"]
+    output_path = batch["output_path"]
     
     start_time = time.time()
     
     print("=" * 80)
     print("HTCondor Preselection Job Executor")
     print("=" * 80)
-    print(f"Batch ID:  {batch_id}")
-    print(f"Dataset:   {dataset_name}")
-    print(f"Year:      {year}")
-    print(f"Files:     {len(input_files)}")
-    print(f"Output:    {output_path}")
-    print(f"Start:     {datetime.fromtimestamp(start_time).isoformat()}")
+    print(f"Batch ID:   {batch_id}")
+    print(f"Dataset:    {dataset_name}")
+    print(f"Year:       {year}")
+    print(f"Files:      {len(input_files)}")
+    print(f"Events:     {batch.get('n_events', 'unknown'):,}")
+    print(f"Output:     {output_path}")
+    print(f"Manifest:   {manifest_path}")
+    print(f"Start:      {datetime.fromtimestamp(start_time).isoformat()}")
     print("=" * 80 + "\n")
     
     try:
-        # Check if output already exists
-        if str(output_path).startswith("root://"):
-            print(f"Note: Cannot check if remote output exists (XRD path)")
-        else:
-            if Path(output_path).exists():
-                print(f"Output already exists: {output_path}")
-                print("Skipping preselection (resuming previous job)\n")
-                
-                # Validate existing output
-                events = validate_output_file(output_path)
-                
-                end_time = time.time()
-                write_metadata_json(
-                    batch_id=batch_id,
-                    dataset_name=dataset_name,
-                    year=year,
-                    input_files=input_files,
-                    output_path=output_path,
-                    status="skipped_already_exists",
-                    events=events,
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-                
-                print(f"\nJob skipped (already exists) in {end_time - start_time:.1f}s")
-                return 0
-        
         # Create temporary staging directory for input files
         with tempfile.TemporaryDirectory(prefix=f"preselection_{batch_id}_") as staging_dir:
             print(f"Staging directory: {staging_dir}\n")
