@@ -51,7 +51,8 @@ def copy_file(file_path: str, destination_dir: str, destination_filename: str = 
         destination = os.path.join(destination_dir, os.path.basename(file_path))
         if destination_filename:
             destination = os.path.join(destination_dir, destination_filename)
-        command = f"xrdcp root://cms-xrd-global.cern.ch/{file_path} {destination}"
+        #command = f"xrdcp root://cms-xrd-global.cern.ch/{file_path} {destination}"
+        command = f"xrdcp root://cmsxrootd.fnal.gov/{file_path} {destination}" #Change redirector based on server where analysis is running
         subprocess.check_call(command, shell=True)
         print(f"Successfully copied {file_path} to {destination}")
         return True
