@@ -69,6 +69,9 @@ echo ""
 # Pass all arguments to the batch job script
 python3 condor/preselection_job_batch.py "$@"
 
+# Copy output JSON back to scratch directory so HTCondor can transfer it
+cp preselection_*.json "${SCRATCH_DIR}/"
+
 JOB_STATUS=$?
 
 # ============================================================================

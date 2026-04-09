@@ -234,7 +234,7 @@ Examples:
     
     if skipped_batches:
         print(f"\nSkipped batches (output already exists):")
-        for batch_id, output_path in skipped_batches:
+        for batch_id, _ in skipped_batches:
             print(f"  - {batch_id}")
     
     print()

@@ -39,7 +39,7 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, OUTPUT, get_store_xrd_path
+from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, OUTPUT, get_store_eos_path
 from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet
 
 
@@ -312,13 +312,13 @@ Examples:
             for batch in batches:
                 batch_id = batch["batch_id"]
                 output_path = f"{OUTPUT['skims_dir']}/preselection_{batch_id}.root"
-                xrd_output = get_store_xrd_path(output_path)
+                eos_output = get_store_eos_path(output_path)
                 
                 manifest["datasets"][dataset_name]["batches"][batch_id] = {
                     "files": batch["files"],
                     "n_files": len(batch["files"]),
                     "n_events": batch["n_events"],
-                    "output_path": xrd_output
+                    "output_path": eos_output
                 }
                 
                 total_batches += 1

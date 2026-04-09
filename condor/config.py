@@ -48,3 +48,18 @@ def get_store_xrd_path(store_path: str) -> str:
     if not store_path.startswith("/store"):
         raise ValueError(f"Expected /store path, got: {store_path}")
     return f"{XRD_ROOT}/{store_path}"
+
+
+def get_store_eos_path(store_path: str) -> str:
+    """
+    Convert a /store path to EOS URL.
+    
+    Args:
+        store_path (str): Path like "/store/user/roguljic/run3-xhbb-anomaly/..."
+    
+    Returns:
+        str: EOS store URL like "root://cmseos.fnal.gov//store/user/roguljic/..." Note that this is different from the XRD path which is "root://cmsxrootd.fnal.gov//store/user/roguljic/..." and applies to lpc-stored files only
+    """
+    if not store_path.startswith("/store"):
+        raise ValueError(f"Expected /store path, got: {store_path}")
+    return f"{EOS_ROOT}/{store_path}"
