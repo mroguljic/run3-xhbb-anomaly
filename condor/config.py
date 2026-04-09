@@ -17,6 +17,7 @@ OUTPUT = {
 # ============================================================================
 
 EOS_ROOT = "root://cmseos.fnal.gov"
+XRD_ROOT = "root://cmsxrootd.fnal.gov"
 
 # EOS command aliases for operations on /store
 EOS_MKDIR = f"eos {EOS_ROOT} mkdir"
@@ -42,8 +43,8 @@ def get_store_xrd_path(store_path: str) -> str:
         store_path (str): Path like "/store/user/roguljic/run3-xhbb-anomaly/..."
     
     Returns:
-        str: XRD URL like "root://cmseos.fnal.gov//store/user/roguljic/..."
+        str: XRD URL like "root://cmsxrootd.fnal.gov//store/user/roguljic/..." Note that this is different from the eos path which is "root://cmseos.fnal.gov//store/user/roguljic/..." and applies to lpc-stored files only
     """
     if not store_path.startswith("/store"):
         raise ValueError(f"Expected /store path, got: {store_path}")
-    return f"{EOS_ROOT}/{store_path}"
+    return f"{XRD_ROOT}/{store_path}"
