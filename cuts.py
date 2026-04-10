@@ -2,7 +2,7 @@ PRESELECTION_CUTS = {
     "2024": {
         "valid_fatjet_pt_min": 300,
         "valid_fatjet_abs_eta_max": 2.4,
-        "valid_fatjet_regressed_mass_min": 40,
+        "valid_fatjet_mass_min": 40,
     }
 }
 

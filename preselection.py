@@ -1,3 +1,4 @@
+
 import ROOT
 import time
 from optparse import OptionParser
@@ -79,6 +80,7 @@ def event_preselection(options: OptionParser) -> None:
     Args:
         options (OptionParser): Command-line options.
     """
+    print("I AM IN MAIN")
     start_time = time.time()
     analyzer = Analyzer.analyzer(options.input)
     data_flag = is_data(analyzer)
@@ -89,6 +91,7 @@ def event_preselection(options: OptionParser) -> None:
     year = options.year
     era = detect_era(options.input) if data_flag else ""
     preselection_cuts = cuts.PRESELECTION_CUTS[year]
+    print("Compiling JetSelection.cc")
     Common.CompileCpp("TIMBER_modules/JetSelection.cc")  # also loads libtimber.so
 
     n_total = get_n_events(analyzer)
@@ -112,23 +115,27 @@ def event_preselection(options: OptionParser) -> None:
     jetveto_file = corrections_paths.corrections[year]["JetVetoMap"]
     AutoJetID.AutoJetID(analyzer, correction_file=jetid_file, jet_types=["Jet", "FatJet"])
     AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.corrections[year]["JEC_AK4"], corrections_paths.corrections[year]["JEC_AK8"]], dataEra=era, verbose=False)
+    AutoJME.AutoJME_mSD(analyzer, jec_path=corrections_paths.corrections[year]["JEC_AK4"], dataEra=era, verbose=False)
     AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
 
     # We use JES__up in MC because it has the highest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
     if data_flag:
         pt_branch_for_selection = "FatJet_pt_nom"
+        mass_branch_for_selection = "FatJet_msoftdrop_nom"
         jec_variations = ["nom"]
     else:        
         pt_branch_for_selection = "FatJet_pt_JES__up"
+        mass_branch_for_selection = "FatJet_msoftdrop_JES__up"  
         jec_variations = ["nom", "JES__up", "JES__down", "JER__up", "JER__down"]
 
     analyzer.Define(
         "valid_fatjet_indices",
-        "SelectJets({0}, FatJet_eta, FatJet_regressed_mass, {1}, {2}, {3})".format(
+        "SelectJets({0}, FatJet_eta, {1}, {2}, {3}, {4})".format(
             pt_branch_for_selection,
+            mass_branch_for_selection,
             preselection_cuts["valid_fatjet_pt_min"],
             preselection_cuts["valid_fatjet_abs_eta_max"],
-            preselection_cuts["valid_fatjet_regressed_mass_min"],
+            preselection_cuts["valid_fatjet_mass_min"],
         ),
     )
     analyzer.Define("n_valid_fatjets", "valid_fatjet_indices.size()")
@@ -148,19 +155,21 @@ def event_preselection(options: OptionParser) -> None:
 
     analyzer.Define("h_cand_reg_mass", "FatJet_regressed_mass[h_cand_idx]")
     analyzer.Define("y_cand_reg_mass", "FatJet_regressed_mass[y_cand_idx]")
+    analyzer.Define("h_cand_kin_mass", "FatJet_mass_nom[h_cand_idx]")
+    analyzer.Define("y_cand_kin_mass", "FatJet_mass_nom[y_cand_idx]")
 
     for jec_variation in jec_variations:
         analyzer.Define(f"h_cand_pt_{jec_variation}", f"FatJet_pt_{jec_variation}[h_cand_idx]")
-        analyzer.Define(f"h_cand_mass_{jec_variation}", f"FatJet_mass_{jec_variation}[h_cand_idx]")
+        analyzer.Define(f"h_cand_msd_{jec_variation}", f"FatJet_msoftdrop_{jec_variation}[h_cand_idx]")
         analyzer.Define(f"y_cand_pt_{jec_variation}", f"FatJet_pt_{jec_variation}[y_cand_idx]")
-        analyzer.Define(f"y_cand_mass_{jec_variation}", f"FatJet_mass_{jec_variation}[y_cand_idx]")
+        analyzer.Define(f"y_cand_msd_{jec_variation}", f"FatJet_msoftdrop_{jec_variation}[y_cand_idx]")
         analyzer.Define(
             "h_cand_vec_{0}".format(jec_variation),
-            "hardware::TLvector(h_cand_pt_{0}, FatJet_eta[h_cand_idx], FatJet_phi[h_cand_idx], FatJet_mass_{0}[h_cand_idx])".format(jec_variation),
+            "hardware::TLvector(h_cand_pt_{0}, FatJet_eta[h_cand_idx], FatJet_phi[h_cand_idx], h_cand_msd_{0})".format(jec_variation),
         )
         analyzer.Define(
             "y_cand_vec_{0}".format(jec_variation),
-            "hardware::TLvector(y_cand_pt_{0}, FatJet_eta[y_cand_idx], FatJet_phi[y_cand_idx], FatJet_mass_{0}[y_cand_idx])".format(jec_variation),
+            "hardware::TLvector(y_cand_pt_{0}, FatJet_eta[y_cand_idx], FatJet_phi[y_cand_idx], y_cand_msd_{0})".format(jec_variation),
         )
         analyzer.Define(f"m_jj_{jec_variation}", f"hardware::InvariantMass({{h_cand_vec_{jec_variation}, y_cand_vec_{jec_variation}}})")
 
