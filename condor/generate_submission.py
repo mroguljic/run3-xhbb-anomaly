@@ -102,7 +102,7 @@ def check_output_exists(output_xrd_path: str) -> bool:
         return False
 
 
-def generate_submission(manifest_dict: dict, manifest_file: str) -> tuple:
+def generate_submission(manifest_dict: dict, manifest_file: str, test: bool) -> tuple:
     """
     Generate HTCondor submission file content from manifest.
     
@@ -111,6 +111,7 @@ def generate_submission(manifest_dict: dict, manifest_file: str) -> tuple:
     Args:
         manifest_dict: Parsed manifest JSON
         manifest_file: Path to manifest file (for reference in .sub)
+        test: If True, only include one batch in the submission file for testing.
     
     Returns:
         Tuple of (sub_file_content, list_of_queued_batch_ids, list_of_skipped_batch_ids)
@@ -120,7 +121,10 @@ def generate_submission(manifest_dict: dict, manifest_file: str) -> tuple:
     skipped_batches = []
     
     for dataset_name, dataset_info in manifest_dict["datasets"].items():
+        n_batches_dataset = 0
         for batch_id in sorted(dataset_info["batches"].keys()):
+            if test and n_batches_dataset >= 1:
+                break
             batch = dataset_info["batches"][batch_id]
             output_path = batch["output_path"]
             
@@ -128,6 +132,7 @@ def generate_submission(manifest_dict: dict, manifest_file: str) -> tuple:
             if check_output_exists(output_path):
                 skipped_batches.append((batch_id, output_path))
             else:
+                n_batches_dataset += 1
                 queued_batches.append(batch_id)
     
     # Create queue entries (one per batch without output)
@@ -164,6 +169,7 @@ Examples:
     )
     parser.add_argument("--manifest", required=True, help="Path to batch manifest JSON file")
     parser.add_argument("--output", required=True, help="Output .sub file path")
+    parser.add_argument("--test", required=False, help="Only generate one batch in submission file for testing", action="store_true")
     
     args = parser.parse_args()
     
@@ -220,7 +226,7 @@ Examples:
                     print(f"  Warning: Failed to create {output_dir}")
     
     print()
-    sub_content, queued_batches, skipped_batches = generate_submission(manifest, manifest_path)
+    sub_content, queued_batches, skipped_batches = generate_submission(manifest, manifest_path, args.test)
     
     # Count total batches in manifest
     total_batches = 0
