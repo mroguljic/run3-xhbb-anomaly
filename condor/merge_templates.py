@@ -19,6 +19,7 @@ Examples:
 """
 
 import argparse
+import fnmatch
 import json
 import shutil
 import subprocess
@@ -34,12 +35,20 @@ from condor.check_template_outputs import stat_eos_file, store_path_from_eos_url
 from condor.config import EOS_MKDIR, OUTPUT, get_store_eos_path
 
 
+DEFAULT_GROUP_RULES = [
+    "Run2024=Run2024*",
+    "QCD=QCD*",
+    "TT=TT*",
+]
+
+
 @dataclass
 class ProcessMergeResult:
     """Result of merging template chunks for a single process."""
 
     process: str
     output_path: str
+    merge_level: str = "process"
     all_inputs: List[str] = field(default_factory=list)
     valid_inputs: List[str] = field(default_factory=list)
     invalid_inputs: List[str] = field(default_factory=list)
@@ -64,7 +73,8 @@ class MergeSummary:
 
     def add(self, result: ProcessMergeResult) -> None:
         """Add one process result and update counters."""
-        self.results[result.process] = result
+        result_key = f"{result.merge_level}:{result.process}"
+        self.results[result_key] = result
         self.total_processes += 1
 
         if result.status == "ok" and result.action == "merge":
@@ -130,6 +140,54 @@ def build_process_inputs(manifest: dict) -> Dict[str, List[str]]:
     return grouped
 
 
+def parse_group_rules(group_rules: Optional[List[str]]) -> Dict[str, List[str]]:
+    """Parse group rules like TARGET=PATTERN1,PATTERN2 into a mapping."""
+    parsed: Dict[str, List[str]] = {}
+    if not group_rules:
+        return parsed
+
+    for rule in group_rules:
+        if "=" not in rule:
+            raise ValueError(f"Invalid group rule '{rule}'. Expected TARGET=PATTERN[,PATTERN...]")
+        target, patterns_raw = rule.split("=", 1)
+        target = target.strip()
+        patterns = [pattern.strip() for pattern in patterns_raw.split(",") if pattern.strip()]
+
+        if not target:
+            raise ValueError(f"Invalid group rule '{rule}': empty target")
+        if not patterns:
+            raise ValueError(f"Invalid group rule '{rule}': no patterns")
+
+        parsed[target] = patterns
+
+    return parsed
+
+
+def build_group_inputs(
+    process_inputs: Dict[str, List[str]],
+    group_rule_map: Dict[str, List[str]],
+    selected_processes: Optional[List[str]] = None,
+) -> Dict[str, List[str]]:
+    """Build grouped input file lists according to wildcard rules."""
+    available_processes = set(process_inputs.keys())
+    scope = set(selected_processes) if selected_processes else available_processes
+
+    grouped: Dict[str, List[str]] = {}
+    for target, patterns in group_rule_map.items():
+        collected: List[str] = []
+        matched = False
+
+        for process in sorted(scope):
+            if any(fnmatch.fnmatch(process, pattern) for pattern in patterns):
+                matched = True
+                collected.extend(process_inputs.get(process, []))
+
+        if matched:
+            grouped[target] = sorted(set(collected))
+
+    return grouped
+
+
 def merge_single_process(
     process: str,
     inputs: List[str],
@@ -144,6 +202,7 @@ def merge_single_process(
     result = ProcessMergeResult(
         process=process,
         output_path=output_eos_path,
+        merge_level="process",
         all_inputs=inputs,
         n_inputs_total=len(inputs),
     )
@@ -201,11 +260,14 @@ def merge_all_processes(
     manifest: dict,
     processes: Optional[List[str]] = None,
     output_name_template: str = "templates_{process}.root",
+    merge_groups: bool = False,
+    group_rules: Optional[List[str]] = None,
+    group_output_name_template: str = "templates_{process}.root",
     dry_run: bool = False,
     overwrite: bool = False,
     verbose: bool = True,
 ) -> MergeSummary:
-    """Merge template chunks for all (or selected) processes in the manifest."""
+    """Merge template chunks for all (or selected) processes and optional groups."""
     grouped_inputs = build_process_inputs(manifest)
     manifest_path = manifest.get("_source_path", "unknown")
     summary = MergeSummary(manifest_path=manifest_path)
@@ -236,6 +298,36 @@ def merge_all_processes(
             else:
                 print(f"  [FAIL] {process}: {result.error}")
 
+    if merge_groups:
+        parsed_rules = parse_group_rules(group_rules)
+        grouped_targets = build_group_inputs(
+            process_inputs=grouped_inputs,
+            group_rule_map=parsed_rules,
+            selected_processes=requested,
+        )
+
+        if verbose:
+            print("\nGrouped merges:")
+
+        for group_name, inputs in grouped_targets.items():
+            result = merge_single_process(
+                process=group_name,
+                inputs=inputs,
+                output_name_template=group_output_name_template,
+                dry_run=dry_run,
+                overwrite=overwrite,
+            )
+            result.merge_level = "group"
+            summary.add(result)
+
+            if verbose:
+                if result.status == "ok":
+                    print(f"  [OK] {group_name}: {result.action} -> {result.output_path}")
+                elif result.status.startswith("skipped"):
+                    print(f"  [SKIP] {group_name}: {result.status} ({result.n_inputs_valid} valid inputs)")
+                else:
+                    print(f"  [FAIL] {group_name}: {result.error}")
+
     return summary
 
 
@@ -249,6 +341,8 @@ Examples:
   python3 merge_templates.py --manifest template_manifest_2024.json
   python3 merge_templates.py --manifest template_manifest_2024.json --dry-run
   python3 merge_templates.py --manifest template_manifest_2024.json --processes TTto4Q
+    python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups
+    python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups --group-rule Run2024=Run2024* --group-rule TT=TT*
         """,
     )
     parser.add_argument("--manifest", required=True, help="Path to template manifest JSON")
@@ -257,6 +351,22 @@ Examples:
         "--output-name-template",
         default="templates_{process}.root",
         help="Merged filename template (default: templates_{process}.root)",
+    )
+    parser.add_argument(
+        "--merge-groups",
+        action="store_true",
+        help="Also produce grouped merges using wildcard rules (defaults: Run2024, QCD, TT)",
+    )
+    parser.add_argument(
+        "--group-rule",
+        action="append",
+        default=None,
+        help="Grouping rule TARGET=PATTERN[,PATTERN...] (repeatable), e.g. Run2024=Run2024*",
+    )
+    parser.add_argument(
+        "--group-output-name-template",
+        default="templates_{process}.root",
+        help="Grouped merged filename template (default: templates_{process}.root)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print actions without writing outputs")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite merged outputs if they already exist")
@@ -292,6 +402,11 @@ Examples:
     print(f"Year:       {manifest.get('year', 'unknown')}")
     print(f"Dry run:    {'yes' if args.dry_run else 'no'}")
     print(f"Overwrite:  {'yes' if args.overwrite else 'no'}")
+    if args.merge_groups:
+        active_group_rules = args.group_rule if args.group_rule else DEFAULT_GROUP_RULES
+        print(f"Group merge: yes ({'; '.join(active_group_rules)})")
+    else:
+        print("Group merge: no")
     print("=" * 80 + "\n")
 
     try:
@@ -299,6 +414,9 @@ Examples:
             manifest=manifest,
             processes=args.processes,
             output_name_template=args.output_name_template,
+            merge_groups=args.merge_groups,
+            group_rules=args.group_rule if args.group_rule else DEFAULT_GROUP_RULES,
+            group_output_name_template=args.group_output_name_template,
             dry_run=args.dry_run,
             overwrite=args.overwrite,
             verbose=not args.quiet,
@@ -324,7 +442,7 @@ Examples:
             "n_copied": summary.n_copied,
             "n_skipped": summary.n_skipped,
             "n_failed": summary.n_failed,
-            "results": {process: asdict(result) for process, result in summary.results.items()},
+            "results": {result_key: asdict(result) for result_key, result in summary.results.items()},
         }
         with open(args.report, "w") as file_handle:
             json.dump(serialisable, file_handle, indent=2)

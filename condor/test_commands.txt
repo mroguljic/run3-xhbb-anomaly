@@ -6,3 +6,6 @@ python3 generate_batches.py  --year 2024 --all-datasets  --output manifest_2024.
 python3 generate_submission.py --manifest manifest_2024.json --output submission.sub --test
 
 python3 generate_template_manifest.py --skim-manifest manifest_2024.json --output template_manifest_2024.json
+python3 generate_submission.py --manifest template_manifest_2024.json --output template_submission.sub
+python3 merge_templates.py --manifest template_manifest_2024.json --dry-run --merge-groups
+python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups
