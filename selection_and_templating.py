@@ -72,21 +72,38 @@ def apply_y_pt_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_p
 
 
 def load_selection_cutflow_histogram(input_file_path: str, data_flag: bool) -> ROOT.TH1:
-    """Load and detach the stage-1 cutflow histogram from the input file."""
+    """Load and sum the stage-1 cutflow histogram across one or more input files.
+
+    If input_file_path is a .txt filelist, each line is treated as a separate
+    ROOT file and the cutflow histograms are summed. Otherwise a single ROOT
+    file is opened directly.
+    """
     histogram_name = "h_cutflow" if data_flag else "h_cutflow_weighted"
-    input_file = ROOT.TFile.Open(input_file_path, "READ")
-    if not input_file or input_file.IsZombie():
-        raise OSError(f"Could not open input file '{input_file_path}' to read the cutflow histogram")
 
-    histogram = input_file.Get(histogram_name)
-    if histogram is None:
+    if input_file_path.endswith(".txt"):
+        with open(input_file_path) as f:
+            root_files = [line.strip() for line in f if line.strip()]
+    else:
+        root_files = [input_file_path]
+
+    total_histogram = None
+    for path in root_files:
+        input_file = ROOT.TFile.Open(path, "READ")
+        if not input_file or input_file.IsZombie():
+            raise OSError(f"Could not open input file '{path}' to read the cutflow histogram")
+        histogram = input_file.Get(histogram_name)
+        if histogram is None:
+            input_file.Close()
+            raise KeyError(f"Histogram '{histogram_name}' was not found in '{path}'")
+        histogram_copy = histogram.Clone()
+        histogram_copy.SetDirectory(0)
         input_file.Close()
-        raise KeyError(f"Histogram '{histogram_name}' was not found in '{input_file_path}'")
+        if total_histogram is None:
+            total_histogram = histogram_copy
+        else:
+            total_histogram.Add(histogram_copy)
 
-    histogram_copy = histogram.Clone(f"{histogram_name}_copy")
-    histogram_copy.SetDirectory(0)
-    input_file.Close()
-    return histogram_copy
+    return total_histogram
 
 
 def make_extended_cutflow_histogram(source_histogram: ROOT.TH1, extra_bins: list[tuple[str, Union[int, float]]]) -> ROOT.TH1F:
@@ -250,7 +267,7 @@ if __name__ == "__main__":
         action='store',
         default='',
         dest='input',
-        help='Stage-1 skim ROOT file to process'
+        help='Stage-1 skim ROOT file or .txt with list of ROOT files to process'
     )
     parser.add_option(
         '-o', '--output',

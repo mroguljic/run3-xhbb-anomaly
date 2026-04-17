@@ -47,9 +47,6 @@ output   = logs/preselection_$(BATCH_ID).out
 error    = logs/preselection_$(BATCH_ID).err
 log      = logs/preselection_$(BATCH_ID).log
 
-# Transfer metadata JSON back from job
-transfer_output_files = preselection_$(BATCH_ID).json
-
 # Arguments passed to condor_wrapper.sh, which passes them to preselection_job_batch.py
 arguments = --batch-id $(BATCH_ID) --manifest {manifest_file}
 

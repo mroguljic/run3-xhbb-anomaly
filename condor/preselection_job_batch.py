@@ -39,63 +39,6 @@ from condor.config import get_store_xrd_path
 
 
 # ============================================================================
-# Logging and Metadata
-# ============================================================================
-
-def write_metadata_json(
-    batch_id: str,
-    dataset_name: str,
-    year: str,
-    input_files: List[str],
-    output_path: str,
-    status: str,
-    events: int = 0,
-    error_msg: str = None,
-    start_time: float = None,
-    end_time: float = None,
-) -> None:
-    """
-    Write job metadata to JSON file.
-    
-    JSON file is named preselection_<batch_id>.json and will be transferred
-    back to submit host by HTCondor (via transfer_output_files).
-    
-    Args:
-        batch_id: Unique batch identifier
-        dataset_name: Name of dataset (e.g., "TTto4Q")
-        year: Data year (e.g., "2024")
-        input_files: List of input file paths
-        output_path: Output ROOT file path
-        status: Job status ("success", "failed", "skipped_already_exists")
-        events: Number of events processed
-        error_msg: Error message if status is "failed"
-        start_time: Unix timestamp of job start
-        end_time: Unix timestamp of job end
-    """
-    metadata = {
-        "batch_id": batch_id,
-        "dataset_name": dataset_name,
-        "year": year,
-        "input_files": input_files,
-        "input_file_count": len(input_files),
-        "output_path": output_path,
-        "status": status,
-        "events_processed": events,
-        "error_msg": error_msg,
-        "start_time": datetime.fromtimestamp(start_time).isoformat() if start_time else None,
-        "end_time": datetime.fromtimestamp(end_time).isoformat() if end_time else None,
-        "duration_seconds": round(end_time - start_time, 1) if start_time and end_time else None,
-    }
-    
-    # Write to current directory (HTCondor will transfer it back)
-    output_file = f"preselection_{batch_id}.json"
-    with open(output_file, 'w') as f:
-        json.dump(metadata, f, indent=2)
-    
-    print(f"Metadata written to {output_file}")
-
-
-# ============================================================================
 # File Operations
 # ============================================================================
 
@@ -388,18 +331,6 @@ Examples:
         
         # Success
         end_time = time.time()
-        write_metadata_json(
-            batch_id=batch_id,
-            dataset_name=dataset_name,
-            year=year,
-            input_files=input_files,
-            output_path=output_path,
-            status="success",
-            events=events,
-            start_time=start_time,
-            end_time=end_time,
-        )
-        
         print("=" * 80)
         print(f"Job completed successfully in {end_time - start_time:.1f}s")
         print("=" * 80)
@@ -412,19 +343,6 @@ Examples:
         print(f"\n{'=' * 80}")
         print(f"ERROR: {error_msg}")
         print("=" * 80 + "\n")
-        
-        # Log failure
-        write_metadata_json(
-            batch_id=batch_id,
-            dataset_name=dataset_name,
-            year=year,
-            input_files=input_files,
-            output_path=output_path,
-            status="failed",
-            error_msg=error_msg,
-            start_time=start_time,
-            end_time=end_time,
-        )
         
         return 1
 
