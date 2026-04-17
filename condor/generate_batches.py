@@ -311,7 +311,7 @@ Examples:
             
             for batch in batches:
                 batch_id = batch["batch_id"]
-                output_path = f"{OUTPUT['skims_dir']}/preselection_{batch_id}.root"
+                output_path = f"{OUTPUT['skims_dir']}/{dataset_name}/preselection_{batch_id}.root"
                 eos_output = get_store_eos_path(output_path)
                 
                 manifest["datasets"][dataset_name]["batches"][batch_id] = {

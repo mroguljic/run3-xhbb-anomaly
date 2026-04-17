@@ -2,7 +2,8 @@
 Condor Submission Framework Configuration
 """
 
-BATCH_TARGET_EVENTS = 1000000
+BATCH_TARGET_EVENTS = 1000000 # Number of input events per skimming batch
+TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
 CAMPAIGN = "20260401"
 BASE_STORE_PATH = "/store/user/roguljic/run3-xhbb-anomaly"
 
