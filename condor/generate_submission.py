@@ -35,7 +35,7 @@ SUB_TEMPLATE = """\
 # Manifest: {manifest_file}
 
 universe = vanilla
-executable = condor_wrapper.sh
+executable = {wrapper_script}
 transfer_executable = True
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
@@ -43,9 +43,9 @@ transfer_input_files = {manifest_file}
 
 +SingularityImage = "/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/jhu-tools/timber:run3/"
 
-output   = logs/preselection_$(BATCH_ID).out
-error    = logs/preselection_$(BATCH_ID).err
-log      = logs/preselection_$(BATCH_ID).log
+output   = logs/{log_subdir}/$(BATCH_ID).out
+error    = logs/{log_subdir}/$(BATCH_ID).err
+log      = logs/{log_subdir}/$(BATCH_ID).log
 
 # Arguments passed to condor_wrapper.sh, which passes them to preselection_job_batch.py
 arguments = --batch-id $(BATCH_ID) --manifest {manifest_file}
@@ -99,7 +99,20 @@ def check_output_exists(output_xrd_path: str) -> bool:
         return False
 
 
-def generate_submission(manifest_dict: dict, manifest_file: str, test: bool) -> tuple:
+def detect_job_stage(manifest_dict: dict) -> str:
+    """Detect submission stage from batch naming convention.
+
+    Returns:
+        "templates" if any batch ID contains "_tpl_chunk_", else "preselection".
+    """
+    for dataset_info in manifest_dict["datasets"].values():
+        for batch_id in dataset_info["batches"].keys():
+            if "_tpl_chunk_" in batch_id:
+                return "templates"
+    return "preselection"
+
+
+def generate_submission(manifest_dict: dict, manifest_file: str, test: bool, log_subdir: str, wrapper_script: str) -> tuple:
     """
     Generate HTCondor submission file content from manifest.
     
@@ -140,6 +153,8 @@ def generate_submission(manifest_dict: dict, manifest_file: str, test: bool) -> 
         generated_at=datetime.now().isoformat(),
         campaign=manifest_dict["campaign"],
         manifest_file=manifest_file,
+        log_subdir=log_subdir,
+        wrapper_script=wrapper_script,
         queue_entries=queue_entries
     )
     
@@ -199,11 +214,12 @@ Examples:
     print(f"Output:         {output_path}")
     print("=" * 80 + "\n")
     
-    # Create logs directory if it doesn't exist
-    logs_dir = Path("logs")
+    # Determine stage and create logs directory if it doesn't exist
+    log_subdir = detect_job_stage(manifest)
+    logs_dir = Path("logs") / log_subdir
     if not logs_dir.exists():
         logs_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Created logs directory: logs/\n")
+        print(f"Created logs directory: {logs_dir}/\n")
     
     # Create output directory on EOS
     print("Creating output directories on EOS...")
@@ -223,7 +239,15 @@ Examples:
                     print(f"  Warning: Failed to create {output_dir}")
     
     print()
-    sub_content, queued_batches, skipped_batches = generate_submission(manifest, manifest_path, args.test)
+    wrapper_script = "template_wrapper.sh" if log_subdir == "templates" else "condor_wrapper.sh"
+
+    sub_content, queued_batches, skipped_batches = generate_submission(
+        manifest,
+        manifest_path,
+        args.test,
+        log_subdir,
+        wrapper_script,
+    )
     
     # Count total batches in manifest
     total_batches = 0
