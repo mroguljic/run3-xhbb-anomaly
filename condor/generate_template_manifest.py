@@ -2,14 +2,13 @@
 """
 Template manifest generator.
 
-Reads the preselection skim manifest (manifest_2024.json), validates that
+Reads the preselection skim manifest (e.g. manifest_2024.json), validates that
 skim output files exist and have non-zero size (using check_skim_outputs.py),
 and groups valid skim files into template batches whose total input size does
 not exceed config.TEMPLATE_BATCH_SIZE GB.
 
 The resulting template manifest follows the same high-level structure as the
-skim manifest so that generate_submission.py and the condor framework can
-consume it with minimal changes.
+skim manifest so that generate_submission.py
 
 Template manifest structure:
 {
@@ -41,12 +40,6 @@ Usage:
     python3 generate_template_manifest.py \\
         --skim-manifest manifest_2024.json \\
         --output template_manifest_2024.json
-
-    # Also validate ROOT file contents (slower, requires ROOT in current env):
-    python3 generate_template_manifest.py \\
-        --skim-manifest manifest_2024.json \\
-        --output template_manifest_2024.json \\
-        --check-root
 """
 
 import argparse
@@ -73,7 +66,7 @@ def chunk_skims_by_size(
 ) -> List[List[SkimCheckResult]]:
     """Group skim check results into chunks whose combined size is <= batch_size_gb.
 
-    A single skim file that exceeds batch_size_gb on its own is placed in a
+    A single skim file that exceeds batch_size_gb on its own is placed in as
     chunk by itself and a warning is emitted — this should not happen in
     practice but avoids silent data loss.
 
@@ -92,11 +85,11 @@ def chunk_skims_by_size(
         file_size_gb = result.size_gb
 
         if file_size_gb > batch_size_gb:
-            print(f"  WARNING: {result.batch_id} is {file_size_gb:.2f} GB, "
+            print(f"  WARNING: {result.batch_id} is {file_size_gb:.3f} GB, "
                   f"which exceeds the batch limit of {batch_size_gb} GB — placing it alone")
 
         # Start a new chunk if adding this file would exceed the limit,
-        # unless the current chunk is empty (avoid infinite loop for oversized files)
+        # unless the current chunk is empty
         if current_chunk and (current_size_gb + file_size_gb > batch_size_gb):
             chunks.append(current_chunk)
             current_chunk = []
@@ -147,7 +140,6 @@ def build_template_manifest(
     total_template_batches = 0
     total_skims_missing = 0
 
-    # Iterate over datasets in the skim manifest, preserving order
     for dataset_key, dataset_info in skim_manifest["datasets"].items():
         dataset_name = dataset_info.get("process", dataset_key)
         n_skim_batches = len(dataset_info.get("batches", {}))
@@ -177,9 +169,8 @@ def build_template_manifest(
         # Sort valid skims by batch_id for reproducibility
         valid.sort(key=lambda r: r.batch_id)
 
-        # Chunk by size
         chunks = chunk_skims_by_size(valid, batch_size_gb)
-        print(f"  -> {len(valid)} valid skims ({sum(r.size_gb for r in valid):.2f} GB total)"
+        print(f"  -> {len(valid)} valid skims ({sum(r.size_gb for r in valid):.3f} GB total)"
               f" -> {len(chunks)} template chunk(s)")
 
         batches: Dict[str, dict] = {}
@@ -233,7 +224,6 @@ Examples:
       --skim-manifest manifest_2024.json \\
       --output template_manifest_2024.json \\
       --batch-size 5.0 \\
-      --check-root
         """,
     )
     parser.add_argument("--skim-manifest", required=True, help="Path to the preselection skim manifest JSON")
@@ -250,12 +240,10 @@ Examples:
         default=None,
         help="Process only these dataset keys (default: all datasets in the skim manifest)",
     )
-    parser.add_argument("--check-root", action="store_true", help="Also validate ROOT file contents (requires ROOT)")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-file output from the skim checker")
 
     args = parser.parse_args()
 
-    # Load skim manifest
     try:
         with open(args.skim_manifest) as f:
             skim_manifest = json.load(f)

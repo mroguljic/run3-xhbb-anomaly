@@ -2,9 +2,9 @@
 Condor Submission Framework Configuration
 """
 
-BATCH_TARGET_EVENTS = 1000000 # Number of input events per skimming batch
+BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
-CAMPAIGN = "20260401"
+CAMPAIGN = "20260410"
 BASE_STORE_PATH = "/store/user/roguljic/run3-xhbb-anomaly"
 
 OUTPUT = {
@@ -24,7 +24,6 @@ XRD_ROOT = "root://cmsxrootd.fnal.gov"
 EOS_MKDIR = f"eos {EOS_ROOT} mkdir"
 EOS_LS = f"eos {EOS_ROOT} ls"
 EOS_CP = f"eos {EOS_ROOT} cp"
-
 
 def get_xrdcp_command() -> str:
     """

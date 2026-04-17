@@ -18,7 +18,7 @@ Usage (standalone):
     # Write a JSON report:
     python3 check_skim_outputs.py --manifest manifest_2024.json --report skim_report.json
 
-    # Also validate ROOT file contents (requires ROOT + access from current env):
+    # Also validate ROOT file content:
     python3 check_skim_outputs.py --manifest manifest_2024.json --check-root
 """
 
@@ -161,8 +161,6 @@ def stat_eos_file(store_path: str) -> Tuple[bool, int, Optional[str]]:
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    except subprocess.TimeoutExpired:
-        return False, 0, f"xrdfs stat timed out for {store_path}"
     except FileNotFoundError:
         return False, 0, "xrdfs not found; ensure XRootD client is installed"
 
@@ -294,7 +292,7 @@ def check_all_skims(
 
             if verbose:
                 status = "OK" if result.ok else ("MISSING" if not result.exists else ("EMPTY" if result.size_bytes == 0 else "INVALID"))
-                size_str = f"{result.size_gb:.2f} GB" if result.exists else "—"
+                size_str = f"{result.size_gb:.3f} GB" if result.exists else "—"
                 print(f"  [{status:7s}] {batch_id} | {size_str}" + (f" | {result.error}" if result.error else ""))
 
     return report
