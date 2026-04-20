@@ -41,9 +41,9 @@ class TemplateCheckResult:
     error: Optional[str] = None
 
     @property
-    def size_gb(self) -> float:
-        """File size in GB."""
-        return self.size_bytes / (1024 ** 3)
+    def size_mb(self) -> float:
+        """File size in MB."""
+        return self.size_bytes / (1024 ** 2)
 
     @property
     def ok(self) -> bool:
@@ -167,7 +167,7 @@ def check_all_templates(
 
             if verbose:
                 status = "OK" if result.ok else ("MISSING" if not result.exists else ("EMPTY" if result.size_bytes == 0 else "INVALID"))
-                size_string = f"{result.size_gb:.3f} GB" if result.exists else "—"
+                size_string = f"{result.size_mb:.2f} MB" if result.exists else "—"
                 print(f"  [{status:7s}] {batch_id} | {size_string}" + (f" | {result.error}" if result.error else ""))
 
     return report
