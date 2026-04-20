@@ -62,16 +62,35 @@ queue BATCH_ID from (
 # Submission Generation
 # ============================================================================
 
-def create_output_directory(output_xrd_path: str) -> bool:
-    """Create output directory on EOS."""
+def eos_directory_exists(store_dir: str) -> bool:
+    """Check whether an EOS directory already exists."""
+    import subprocess
+
+    cmd = f"{EOS_LS} {store_dir}"
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def create_output_directory(output_xrd_path: str) -> str:
+    """Ensure output directory exists on EOS.
+
+    Returns:
+        str: One of "created", "exists", or "failed".
+    """
     import subprocess
     from pathlib import Path
     
     store_path = output_xrd_path.replace('root://cmseos.fnal.gov', '')
     store_dir = str(Path(store_path).parent)
+
+    if eos_directory_exists(store_dir):
+        return "exists"
     
     cmd = f"{EOS_MKDIR} -p {store_dir}"
-    return subprocess.run(cmd, shell=True, capture_output=True).returncode == 0
+    result = subprocess.run(cmd, shell=True, capture_output=True)
+    if result.returncode == 0:
+        return "created"
+    return "failed"
 
 
 def check_output_exists(output_xrd_path: str) -> bool:
@@ -232,9 +251,13 @@ Examples:
             
             # Avoid redundant mkdir calls for same directory
             if output_dir not in output_dirs_created:
-                if create_output_directory(batch_output_path):
-                    output_dirs_created.add(output_dir)
+                directory_status = create_output_directory(batch_output_path)
+                output_dirs_created.add(output_dir)
+
+                if directory_status == "created":
                     print(f"  Created: {output_dir}")
+                elif directory_status == "exists":
+                    print(f"  Exists:  {output_dir}")
                 else:
                     print(f"  Warning: Failed to create {output_dir}")
     
