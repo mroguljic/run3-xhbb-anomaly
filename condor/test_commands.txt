@@ -9,3 +9,9 @@ python3 generate_template_manifest.py --skim-manifest manifest_2024.json --outpu
 python3 generate_submission.py --manifest template_manifest_2024.json --output template_submission.sub
 python3 merge_templates.py --manifest template_manifest_2024.json --dry-run --merge-groups
 python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups
+
+# Controller (M1)
+python3 controller.py --year 2024 --all-datasets --dry-run
+python3 controller.py --year 2024 --all-datasets
+python3 controller.py --year 2024 --all-datasets --auto-submit --resubmit-missing
+python3 controller.py --year 2024 --datasets TTto4Q QCD-4Jets_HT-800to1000 --dry-run
