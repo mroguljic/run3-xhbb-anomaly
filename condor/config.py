@@ -22,7 +22,6 @@ DEFAULT_YEAR = "2024"
 
 AUTO_SUBMIT = False
 AUTO_RESUBMIT_MISSING = False
-CONTROLLER_INTERACTIVE = True
 
 MERGED_TEMPLATE_FILENAME = "templates_{process}.root"
 LOCAL_MERGED_TEMPLATES_DIR = "output/templates/merged"

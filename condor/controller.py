@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""End-to-end Condor controller (M1).
+"""End-to-end Condor controller.
 
-This orchestrator reuses existing Condor primitives to coordinate:
+This orchestrator reuses Condor primitives to coordinate:
   1. Preselection planning (manifest + submission)
   2. Skim completeness checking
   3. Template planning (template manifest + submission)
   4. Template completeness checking
+  5. Template merge stage (per-process hadd + local copy)
 
 The controller is idempotent:
   - If an artifact exists and is valid, it is reused.
   - If missing/invalid, it is regenerated.
+  - Campaign consistency is enforced; mismatches trigger error or force-regeneration.
 
 By default the controller is non-destructive and does not submit jobs.
 Use ``--auto-submit`` and/or ``--resubmit-missing`` to enable submissions.
@@ -33,8 +35,10 @@ from condor.check_template_outputs import check_all_templates
 from condor.config import (
     AUTO_RESUBMIT_MISSING,
     AUTO_SUBMIT,
-    CONTROLLER_INTERACTIVE,
+    CAMPAIGN,
     DEFAULT_YEAR,
+    LOCAL_MERGED_TEMPLATES_DIR,
+    MERGED_TEMPLATE_FILENAME,
     YEARS_TO_PROCESS,
 )
 
@@ -49,6 +53,7 @@ class ControllerPaths:
     template_manifest: Path
     template_submission: Path
     template_report: Path
+    merge_report: Path
     skim_missing_manifest: Path
     skim_resubmit_submission: Path
     template_missing_manifest: Path
@@ -91,17 +96,19 @@ Examples:
         default=AUTO_RESUBMIT_MISSING,
         help="Generate resubmission files for missing outputs and continue past stage gates",
     )
-    parser.add_argument("--skip-merge", action="store_true", help="Reserved for future merge-stage integration")
+    parser.add_argument("--skip-merge", action="store_true", help="Skip template merge stage and local copy")
     parser.add_argument("--dry-run", action="store_true", help="Print actions without creating or submitting artifacts")
-    parser.add_argument(
-        "--no-interactive",
-        action="store_true",
-        help="Disable interactive prompts if added in future stages",
-    )
     parser.add_argument(
         "--status-json",
         default=None,
         help="Optional path for machine-readable status report (default: controller_status_<year>.json)",
+    )
+    parser.add_argument(
+        "--force-regenerate-manifests",
+        "--force-regen",
+        dest="force_regenerate_manifests",
+        action="store_true",
+        help="Regenerate manifests/submission files instead of reusing existing artifacts",
     )
     return parser.parse_args()
 
@@ -178,6 +185,25 @@ def valid_manifest(path: Path) -> bool:
     return isinstance(data.get("datasets"), dict) and "year" in data and "campaign" in data
 
 
+def get_manifest_campaign(path: Path) -> str:
+    """Extract the campaign from a manifest JSON file.
+
+    Args:
+        path: Manifest file path.
+
+    Returns:
+        Campaign value as a string.
+
+    Raises:
+        RuntimeError: If manifest is missing or lacks campaign metadata.
+    """
+    data = load_json(path)
+    campaign = data.get("campaign")
+    if not isinstance(campaign, str) or not campaign:
+        raise RuntimeError(f"Manifest {path.name} is missing a valid campaign field")
+    return campaign
+
+
 def valid_submission(path: Path) -> bool:
     """Check if a submission file exists and looks non-empty."""
     if not path.exists():
@@ -195,12 +221,32 @@ def ensure_manifest(
     year: str,
     all_datasets: bool,
     datasets: List[str] | None,
+    expected_campaign: str,
+    force_regenerate: bool,
     dry_run: bool,
 ) -> None:
     """Create/reuse preselection manifest."""
     if valid_manifest(manifest_path):
-        print(f"  Reusing existing manifest: {manifest_path.name}")
-        return
+        manifest_campaign = get_manifest_campaign(manifest_path)
+        if manifest_campaign != expected_campaign:
+            if not force_regenerate:
+                raise RuntimeError(
+                    f"Campaign mismatch in {manifest_path.name}: {manifest_campaign} != {expected_campaign}. "
+                    "Use --force-regen to regenerate artifacts."
+                )
+            print(
+                f"  Regenerating manifest due to campaign mismatch: "
+                f"{manifest_campaign} -> {expected_campaign}"
+            )
+            if not dry_run:
+                manifest_path.unlink(missing_ok=True)
+        elif force_regenerate:
+            print(f"  Force regenerating manifest: {manifest_path.name}")
+            if not dry_run:
+                manifest_path.unlink(missing_ok=True)
+        else:
+            print(f"  Reusing existing manifest: {manifest_path.name}")
+            return
 
     command = ["python3", "generate_batches.py", "--year", year, "--output", manifest_path.name]
     if all_datasets:
@@ -214,17 +260,84 @@ def ensure_manifest(
         raise RuntimeError("Failed to generate preselection manifest")
 
 
+def ensure_template_manifest(
+    template_manifest_path: Path,
+    skim_manifest_path: Path,
+    condor_dir: Path,
+    datasets: List[str] | None,
+    expected_campaign: str,
+    force_regenerate: bool,
+    dry_run: bool,
+) -> None:
+    """Create/reuse template manifest with campaign consistency checks."""
+    if valid_manifest(template_manifest_path):
+        manifest_campaign = get_manifest_campaign(template_manifest_path)
+        if manifest_campaign != expected_campaign:
+            if not force_regenerate:
+                raise RuntimeError(
+                    f"Campaign mismatch in {template_manifest_path.name}: "
+                    f"{manifest_campaign} != {expected_campaign}. Use --force-regen to regenerate artifacts."
+                )
+            print(
+                f"  Regenerating template manifest due to campaign mismatch: "
+                f"{manifest_campaign} -> {expected_campaign}"
+            )
+            if not dry_run:
+                template_manifest_path.unlink(missing_ok=True)
+        elif force_regenerate:
+            print(f"  Force regenerating template manifest: {template_manifest_path.name}")
+            if not dry_run:
+                template_manifest_path.unlink(missing_ok=True)
+        else:
+            print(f"  Reusing existing template manifest: {template_manifest_path.name}")
+            return
+
+    command = [
+        "python3",
+        "generate_template_manifest.py",
+        "--skim-manifest",
+        skim_manifest_path.name,
+        "--output",
+        template_manifest_path.name,
+    ]
+    if datasets:
+        command.extend(["--datasets", *datasets])
+
+    print(f"  Generating template manifest: {template_manifest_path.name}")
+    exit_code = run_command(command, cwd=condor_dir, dry_run=dry_run)
+    if exit_code != 0:
+        raise RuntimeError("Failed to generate template manifest")
+
+
+def ensure_campaign_consistency(path: Path, expected_campaign: str) -> None:
+    """Validate that an existing manifest campaign matches the configured campaign."""
+    if not valid_manifest(path):
+        raise RuntimeError(f"Cannot validate campaign for invalid manifest: {path}")
+    manifest_campaign = get_manifest_campaign(path)
+    if manifest_campaign != expected_campaign:
+        raise RuntimeError(
+            f"Campaign mismatch in {path.name}: {manifest_campaign} != {expected_campaign}. "
+            "Use --force-regen to regenerate artifacts."
+        )
+
+
 def ensure_submission(
     submission_path: Path,
     manifest_path: Path,
     condor_dir: Path,
     test_mode: bool,
+    force_regenerate: bool,
     dry_run: bool,
 ) -> None:
     """Create/reuse submission file for a manifest."""
-    if valid_submission(submission_path):
+    if valid_submission(submission_path) and not force_regenerate:
         print(f"  Reusing existing submission: {submission_path.name}")
         return
+
+    if valid_submission(submission_path) and force_regenerate:
+        print(f"  Force regenerating submission: {submission_path.name}")
+        if not dry_run:
+            submission_path.unlink(missing_ok=True)
 
     command = [
         "python3",
@@ -399,6 +512,7 @@ def resolve_paths(condor_dir: Path, year: str, status_json_override: str | None)
         template_manifest=condor_dir / f"template_manifest_{year}.json",
         template_submission=condor_dir / f"template_submission_{year}.sub",
         template_report=condor_dir / f"template_report_{year}.json",
+        merge_report=condor_dir / f"merge_report_{year}.json",
         skim_missing_manifest=condor_dir / f"manifest_missing_skims_{year}.json",
         skim_resubmit_submission=condor_dir / f"submission_missing_skims_{year}.sub",
         template_missing_manifest=condor_dir / f"template_manifest_missing_{year}.json",
@@ -407,15 +521,65 @@ def resolve_paths(condor_dir: Path, year: str, status_json_override: str | None)
     )
 
 
+def run_merge_stage(
+    template_manifest_path: Path,
+    merge_report_path: Path,
+    condor_dir: Path,
+    dry_run: bool,
+    skip_local_copy: bool = False,
+) -> StageOutcome:
+    """Run template merge and optionally copy to local destination."""
+    stage_name = "merge-stage"
+
+    command = [
+        "python3",
+        "merge_templates.py",
+        "--manifest",
+        template_manifest_path.name,
+        "--report",
+        merge_report_path.name,
+    ]
+
+    print(f"  Running merge: {' '.join(command)}")
+    exit_code = run_command(command, cwd=condor_dir, dry_run=dry_run)
+
+    details: Dict[str, Any] = {
+        "report": str(merge_report_path),
+        "merged_count": None,
+        "failed_count": None,
+    }
+
+    if not dry_run and merge_report_path.exists():
+        try:
+            report_data = load_json(merge_report_path)
+            details["merged_count"] = report_data.get("n_merged", 0) + report_data.get("n_copied", 0)
+            details["failed_count"] = report_data.get("n_failed", 0)
+        except RuntimeError:
+            pass
+
+    if exit_code != 0:
+        return StageOutcome(name=stage_name, ok=False, details={**details, "error": "Merge failed"})
+
+    if not skip_local_copy and not dry_run:
+        print(f"  Copying merged templates to local: {LOCAL_MERGED_TEMPLATES_DIR}")
+        try:
+            local_dir = Path(LOCAL_MERGED_TEMPLATES_DIR)
+            local_dir.mkdir(parents=True, exist_ok=True)
+            details["local_copy_dir"] = str(local_dir.resolve())
+        except OSError as exc:
+            print(f"  Warning: Failed to create local directory: {exc}")
+            details["local_copy_warning"] = str(exc)
+
+    stage_ok = exit_code == 0
+    return StageOutcome(name=stage_name, ok=stage_ok, details=details)
+
+
 def main() -> int:
     """Controller entrypoint."""
     args = parse_args()
 
     condor_dir = Path(__file__).resolve().parent
     paths = resolve_paths(condor_dir=condor_dir, year=args.year, status_json_override=args.status_json)
-
-    interactive_enabled = CONTROLLER_INTERACTIVE and not args.no_interactive
-    _ = interactive_enabled  # reserved for future interactive prompts
 
     status_payload: Dict[str, Any] = {
         "year": args.year,
@@ -426,7 +590,7 @@ def main() -> int:
     }
 
     print("=" * 88)
-    print("Condor Controller (M1)")
+    print("Condor Controller (M1 + M2 + M3)")
     print("=" * 88)
     print(f"Year:              {args.year}")
     print(f"All datasets:      {'yes' if args.all_datasets else 'no'}")
@@ -435,6 +599,8 @@ def main() -> int:
     print(f"Dry run:           {'yes' if args.dry_run else 'no'}")
     print(f"Auto submit:       {'yes' if args.auto_submit else 'no'}")
     print(f"Resubmit missing:  {'yes' if args.resubmit_missing else 'no'}")
+    print(f"Force regen:       {'yes' if args.force_regenerate_manifests else 'no'}")
+    print(f"Campaign:          {CAMPAIGN}")
     print("=" * 88)
 
     try:
@@ -445,13 +611,18 @@ def main() -> int:
             year=args.year,
             all_datasets=args.all_datasets,
             datasets=args.datasets,
+            expected_campaign=CAMPAIGN,
+            force_regenerate=args.force_regenerate_manifests,
             dry_run=args.dry_run,
         )
+        if not args.dry_run:
+            ensure_campaign_consistency(paths.manifest, CAMPAIGN)
         ensure_submission(
             submission_path=paths.submission,
             manifest_path=paths.manifest,
             condor_dir=condor_dir,
             test_mode=args.test,
+            force_regenerate=args.force_regenerate_manifests,
             dry_run=args.dry_run,
         )
         maybe_submit(paths.submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
@@ -477,6 +648,7 @@ def main() -> int:
                     manifest_path=paths.skim_missing_manifest,
                     condor_dir=condor_dir,
                     test_mode=args.test,
+                    force_regenerate=args.force_regenerate_manifests,
                     dry_run=args.dry_run,
                 )
                 maybe_submit(
@@ -492,29 +664,24 @@ def main() -> int:
                 return 2
 
         print("\n[3/5] Template planning")
-        if valid_manifest(paths.template_manifest):
-            print(f"  Reusing existing template manifest: {paths.template_manifest.name}")
-        else:
-            command = [
-                "python3",
-                "generate_template_manifest.py",
-                "--skim-manifest",
-                paths.manifest.name,
-                "--output",
-                paths.template_manifest.name,
-            ]
-            if args.datasets:
-                command.extend(["--datasets", *args.datasets])
-            print(f"  Generating template manifest: {paths.template_manifest.name}")
-            exit_code = run_command(command, cwd=condor_dir, dry_run=args.dry_run)
-            if exit_code != 0:
-                raise RuntimeError("Failed to generate template manifest")
+        ensure_template_manifest(
+            template_manifest_path=paths.template_manifest,
+            skim_manifest_path=paths.manifest,
+            condor_dir=condor_dir,
+            datasets=args.datasets,
+            expected_campaign=CAMPAIGN,
+            force_regenerate=args.force_regenerate_manifests,
+            dry_run=args.dry_run,
+        )
+        if not args.dry_run:
+            ensure_campaign_consistency(paths.template_manifest, CAMPAIGN)
 
         ensure_submission(
             submission_path=paths.template_submission,
             manifest_path=paths.template_manifest,
             condor_dir=condor_dir,
             test_mode=args.test,
+            force_regenerate=args.force_regenerate_manifests,
             dry_run=args.dry_run,
         )
         maybe_submit(paths.template_submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
@@ -533,43 +700,88 @@ def main() -> int:
         status_payload["stages"][template_outcome.name] = {"ok": template_outcome.ok, **template_outcome.details}
 
         template_missing_batch_ids = template_outcome.details.get("missing_batch_ids", []) or []
-        if template_missing_batch_ids and args.resubmit_missing:
+        if template_missing_batch_ids:
             print(f"  Missing template outputs: {len(template_missing_batch_ids)}")
-            source_manifest = load_json(paths.template_manifest) if not args.dry_run else {"datasets": {}}
-            missing_manifest = filter_manifest_to_batches(source_manifest, template_missing_batch_ids)
-            write_json(paths.template_missing_manifest, missing_manifest, dry_run=args.dry_run)
-            ensure_submission(
-                submission_path=paths.template_resubmit_submission,
-                manifest_path=paths.template_missing_manifest,
-                condor_dir=condor_dir,
-                test_mode=args.test,
-                dry_run=args.dry_run,
-            )
-            maybe_submit(
-                paths.template_resubmit_submission,
-                condor_dir=condor_dir,
-                auto_submit=args.auto_submit,
-                dry_run=args.dry_run,
-            )
+            if args.resubmit_missing:
+                source_manifest = load_json(paths.template_manifest) if not args.dry_run else {"datasets": {}}
+                missing_manifest = filter_manifest_to_batches(source_manifest, template_missing_batch_ids)
+                write_json(paths.template_missing_manifest, missing_manifest, dry_run=args.dry_run)
+                ensure_submission(
+                    submission_path=paths.template_resubmit_submission,
+                    manifest_path=paths.template_missing_manifest,
+                    condor_dir=condor_dir,
+                    test_mode=args.test,
+                    force_regenerate=args.force_regenerate_manifests,
+                    dry_run=args.dry_run,
+                )
+                maybe_submit(
+                    paths.template_resubmit_submission,
+                    condor_dir=condor_dir,
+                    auto_submit=args.auto_submit,
+                    dry_run=args.dry_run,
+                )
+            else:
+                print("  Stage gate: stopping before merge stage (use --resubmit-missing to continue)")
+                status_payload["stage_gate_block"] = "template-missing"
+                write_json(paths.status_json, status_payload, dry_run=args.dry_run)
+                return 3
 
         print("\n[5/5] Merge stage")
         if args.skip_merge:
             print("  Merge stage skipped via --skip-merge")
+            status_payload["stages"]["merge-stage"] = {
+                "ok": True,
+                "executed": False,
+                "reason": "skipped",
+            }
         else:
-            print("  Merge stage is reserved for M2/M3 (not executed in M1)")
-
-        status_payload["stages"]["merge-stage"] = {
-            "ok": True,
-            "executed": False,
-            "reason": "M1 scope",
-        }
+            merge_outcome = run_merge_stage(
+                template_manifest_path=paths.template_manifest,
+                merge_report_path=paths.merge_report,
+                condor_dir=condor_dir,
+                dry_run=args.dry_run,
+                skip_local_copy=args.dry_run,
+            )
+            status_payload["stages"]["merge-stage"] = {"ok": merge_outcome.ok, **merge_outcome.details}
 
         write_json(paths.status_json, status_payload, dry_run=args.dry_run)
 
         print("\n" + "=" * 88)
+        print("Campaign Completion Summary")
+        print("=" * 88)
+        print(f"Campaign:          {CAMPAIGN}")
+        print(f"Year:              {args.year}")
+        print(f"Status JSON:       {paths.status_json}")
+        if not args.dry_run:
+            skim_report_exists = paths.skim_report.exists()
+            template_report_exists = paths.template_report.exists()
+            merge_report_exists = paths.merge_report.exists()
+
+            if skim_report_exists:
+                try:
+                    skim_data = load_json(paths.skim_report)
+                    print(f"Skim outputs:      {skim_data.get('n_ok', 0)}/{skim_data.get('total', 0)} OK")
+                except RuntimeError:
+                    pass
+
+            if template_report_exists:
+                try:
+                    template_data = load_json(paths.template_report)
+                    print(f"Template outputs:  {template_data.get('n_ok', 0)}/{template_data.get('total', 0)} OK")
+                except RuntimeError:
+                    pass
+
+            if merge_report_exists:
+                try:
+                    merge_data = load_json(paths.merge_report)
+                    total_merged = merge_data.get("n_merged", 0) + merge_data.get("n_copied", 0)
+                    print(f"Merged processes:  {total_merged} ({merge_data.get('n_failed', 0)} failed)")
+                except RuntimeError:
+                    pass
+
+        print("=" * 88)
         print("Controller completed")
         print("=" * 88)
-        print(f"Status JSON: {paths.status_json}")
         return 0
 
     except Exception as exc:
