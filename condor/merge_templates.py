@@ -21,6 +21,7 @@ Examples:
 import argparse
 import fnmatch
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -32,8 +33,9 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.check_template_outputs import stat_eos_file, store_path_from_eos_url
-from condor.config import EOS_MKDIR, OUTPUT, get_store_eos_path
-
+from condor.config import EOS_MKDIR, LOCAL_MERGED_TEMPLATES_DIR, OUTPUT, get_store_eos_path
+from filelists.xsecs import get_int_lumi, get_xsec
+import ROOT
 
 DEFAULT_GROUP_RULES = [
     "Run2024=Run2024*",
@@ -56,6 +58,8 @@ class ProcessMergeResult:
     n_inputs_valid: int = 0
     action: str = "none"
     status: str = "pending"
+    local_output_path: Optional[str] = None
+    scale_factor: Optional[float] = None
     error: Optional[str] = None
 
 
@@ -119,6 +123,85 @@ def run_hadd(output_file: str, inputs: List[str]) -> None:
     completed = subprocess.run(command, capture_output=True, text=True)
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "hadd failed")
+
+
+def is_data_process(process: str) -> bool:
+    """Return True for data process names like Run2024C."""
+    return process.startswith("Run20")
+
+
+def get_sum_gen_weight(template_file_path: str) -> float:
+    """Read the first bin of template_cutflow from a local ROOT file."""
+
+    root_file = ROOT.TFile.Open(template_file_path, "READ")
+    if not root_file or root_file.IsZombie():
+        raise RuntimeError(f"Could not open ROOT file '{template_file_path}' to read template_cutflow")
+
+    template_cutflow = root_file.Get("template_cutflow")
+    if template_cutflow is None:
+        root_file.Close()
+        raise RuntimeError(f"Histogram 'template_cutflow' not found in '{template_file_path}'")
+
+    sum_gen_weight = float(template_cutflow.GetBinContent(1))
+    root_file.Close()
+
+    if sum_gen_weight == 0.0:
+        raise RuntimeError(f"template_cutflow bin 1 is zero in '{template_file_path}'")
+
+    return sum_gen_weight
+
+
+def scale_histograms_in_directory(directory: object, scale_factor: float) -> int:
+    """Scale all TH1- and TH2-derived objects in a ROOT directory recursively."""
+
+    scaled_histograms = 0
+    for key in directory.GetListOfKeys():
+        obj = key.ReadObj()
+
+        if obj.InheritsFrom("TDirectory"):
+            scaled_histograms += scale_histograms_in_directory(obj, scale_factor)
+            directory.cd()
+            continue
+
+        if obj.InheritsFrom("TH1") or obj.InheritsFrom("TH2"):
+            obj.Scale(scale_factor)
+            directory.cd()
+            obj.Write(obj.GetName(), ROOT.TObject.kOverwrite)
+            scaled_histograms += 1
+
+    return scaled_histograms
+
+
+def scale_merged_mc_template(template_file_path: str, process: str, year: str) -> float:
+    """Scale a merged MC template file in place and return the applied factor."""
+    sum_gen_weight = get_sum_gen_weight(template_file_path)
+    int_lumi = get_int_lumi(year)
+    xsec = get_xsec(process)
+    scale_factor = int_lumi * xsec / sum_gen_weight
+
+    ROOT.gROOT.SetBatch(True)
+    root_file = ROOT.TFile.Open(template_file_path, "UPDATE")
+    if not root_file or root_file.IsZombie():
+        raise RuntimeError(f"Could not open ROOT file '{template_file_path}' for scaling")
+
+    scaled_histograms = scale_histograms_in_directory(root_file, scale_factor)
+    root_file.Close()
+
+    if scaled_histograms == 0:
+        raise RuntimeError(f"No histograms found to scale in '{template_file_path}'")
+
+    return scale_factor
+
+
+def get_local_output_path(process: str, output_name_template: str) -> str:
+    """Return the local merged template destination for a process or group."""
+    return str(Path(LOCAL_MERGED_TEMPLATES_DIR) / output_name_template.format(process=process))
+
+
+def copy_output_to_local(output_eos_path: str, local_output_path: str) -> None:
+    """Copy one merged EOS output to the configured local results directory."""
+    os.makedirs(str(Path(local_output_path).parent), exist_ok=True)
+    run_xrdcp(output_eos_path, local_output_path)
 
 
 def build_process_inputs(manifest: dict) -> Dict[str, List[str]]:
@@ -192,18 +275,23 @@ def merge_single_process(
     process: str,
     inputs: List[str],
     output_name_template: str,
+    year: Optional[str] = None,
+    apply_scale: bool = False,
+    copy_local: bool = True,
     dry_run: bool = False,
     overwrite: bool = False,
 ) -> ProcessMergeResult:
     """Merge or copy template chunks for one process."""
     output_store_path = f"{OUTPUT['templates_dir']}/{process}/{output_name_template.format(process=process)}"
     output_eos_path = get_store_eos_path(output_store_path)
+    local_output_path = get_local_output_path(process, output_name_template) if copy_local else None
 
     result = ProcessMergeResult(
         process=process,
         output_path=output_eos_path,
         merge_level="process",
         all_inputs=inputs,
+        local_output_path=local_output_path,
         n_inputs_total=len(inputs),
     )
 
@@ -223,6 +311,13 @@ def merge_single_process(
         return result
 
     if eos_file_exists(output_eos_path) and not overwrite:
+        if copy_local and local_output_path and not dry_run:
+            try:
+                copy_output_to_local(output_eos_path, local_output_path)
+            except Exception as exc:
+                result.status = "failed"
+                result.error = f"Existing merged output found, but local copy failed: {exc}"
+                return result
         result.status = "skipped-existing"
         result.action = "skip"
         return result
@@ -235,18 +330,24 @@ def merge_single_process(
     try:
         ensure_eos_directory(output_eos_path)
 
-        if result.n_inputs_valid == 1:
-            run_xrdcp(result.valid_inputs[0], output_eos_path)
-            result.action = "copy"
-            result.status = "ok"
-            return result
-
         with tempfile.TemporaryDirectory(prefix=f"merge_{process}_") as temp_dir:
-            local_output = str(Path(temp_dir) / f"merged_{process}.root")
-            run_hadd(local_output, result.valid_inputs)
-            run_xrdcp(local_output, output_eos_path)
+            local_output = str(Path(temp_dir) / output_name_template.format(process=process))
 
-        result.action = "merge"
+            if result.n_inputs_valid == 1:
+                run_xrdcp(result.valid_inputs[0], local_output)
+            else:
+                run_hadd(local_output, result.valid_inputs)
+
+            if apply_scale:
+                if year is None:
+                    raise RuntimeError("Year is required when scaling MC templates")
+                result.scale_factor = scale_merged_mc_template(local_output, process, year)
+
+            run_xrdcp(local_output, output_eos_path)
+            if copy_local and local_output_path:
+                copy_output_to_local(output_eos_path, local_output_path)
+
+        result.action = "copy" if result.n_inputs_valid == 1 else "merge"
         result.status = "ok"
         return result
 
@@ -270,7 +371,9 @@ def merge_all_processes(
     """Merge template chunks for all (or selected) processes and optional groups."""
     grouped_inputs = build_process_inputs(manifest)
     manifest_path = manifest.get("_source_path", "unknown")
+    year = str(manifest.get("year", "unknown"))
     summary = MergeSummary(manifest_path=manifest_path)
+    merged_process_outputs: Dict[str, List[str]] = {}
 
     requested = sorted(grouped_inputs.keys())
     if processes:
@@ -285,23 +388,32 @@ def merge_all_processes(
             process=process,
             inputs=inputs,
             output_name_template=output_name_template,
+            year=year,
+            apply_scale=not is_data_process(process),
+            copy_local=True,
             dry_run=dry_run,
             overwrite=overwrite,
         )
         summary.add(result)
 
+        if result.status != "failed":
+            merged_process_outputs[process] = [result.output_path]
+
         if verbose:
             if result.status == "ok":
-                print(f"  [OK] {process}: {result.action} -> {result.output_path}")
+                scale_note = f" | scale={result.scale_factor:.8g}" if result.scale_factor is not None else ""
+                local_note = f" | local={result.local_output_path}" if result.local_output_path else ""
+                print(f"  [OK] {process}: {result.action} -> {result.output_path}{local_note}{scale_note}")
             elif result.status.startswith("skipped"):
-                print(f"  [SKIP] {process}: {result.status} ({result.n_inputs_valid} valid inputs)")
+                local_note = f" | local={result.local_output_path}" if result.local_output_path else ""
+                print(f"  [SKIP] {process}: {result.status} ({result.n_inputs_valid} valid inputs){local_note}")
             else:
                 print(f"  [FAIL] {process}: {result.error}")
 
     if merge_groups:
         parsed_rules = parse_group_rules(group_rules)
         grouped_targets = build_group_inputs(
-            process_inputs=grouped_inputs,
+            process_inputs=merged_process_outputs,
             group_rule_map=parsed_rules,
             selected_processes=requested,
         )
@@ -314,6 +426,9 @@ def merge_all_processes(
                 process=group_name,
                 inputs=inputs,
                 output_name_template=group_output_name_template,
+                year=year,
+                apply_scale=False,
+                copy_local=True,
                 dry_run=dry_run,
                 overwrite=overwrite,
             )
@@ -322,9 +437,11 @@ def merge_all_processes(
 
             if verbose:
                 if result.status == "ok":
-                    print(f"  [OK] {group_name}: {result.action} -> {result.output_path}")
+                    local_note = f" | local={result.local_output_path}" if result.local_output_path else ""
+                    print(f"  [OK] {group_name}: {result.action} -> {result.output_path}{local_note}")
                 elif result.status.startswith("skipped"):
-                    print(f"  [SKIP] {group_name}: {result.status} ({result.n_inputs_valid} valid inputs)")
+                    local_note = f" | local={result.local_output_path}" if result.local_output_path else ""
+                    print(f"  [SKIP] {group_name}: {result.status} ({result.n_inputs_valid} valid inputs){local_note}")
                 else:
                     print(f"  [FAIL] {group_name}: {result.error}")
 
