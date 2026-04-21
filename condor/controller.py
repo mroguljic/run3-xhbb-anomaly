@@ -25,6 +25,7 @@ import subprocess
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -47,6 +48,7 @@ from condor.config import (
 class ControllerPaths:
     """Resolved artifact paths for a given year."""
 
+    bookkeeping_dir: Path
     manifest: Path
     submission: Path
     skim_report: Path
@@ -170,8 +172,72 @@ def write_json(path: Path, payload: Dict[str, Any], dry_run: bool) -> None:
         print(f"  DRY-RUN: would write {path}")
         return
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as file_handle:
         json.dump(payload, file_handle, indent=2)
+
+
+def prompt_yes_no(question: str, default: bool = False) -> bool:
+    """Prompt user for yes/no input with a default choice."""
+    suffix = "[Y/n]" if default else "[y/N]"
+    while True:
+        try:
+            response = input(f"{question} {suffix} ").strip().lower()
+        except EOFError:
+            return default
+
+        if response == "":
+            return default
+        if response in {"y", "yes"}:
+            return True
+        if response in {"n", "no"}:
+            return False
+        print("  Please answer 'y' or 'n'.")
+
+
+def choose_step_action(step_label: str, report_path: Path | None = None) -> str:
+    """Return action for a stage: run, reuse, or skip."""
+    if report_path is not None and report_path.exists():
+        timestamp = datetime.fromtimestamp(report_path.stat().st_mtime).isoformat(timespec="seconds")
+        print(f"  Found previous report: {report_path} (updated {timestamp})")
+        if prompt_yes_no("  Reuse previous report?", default=True):
+            return "reuse"
+
+    if prompt_yes_no(f"  Perform {step_label}?", default=False):
+        return "run"
+    return "skip"
+
+
+def outcome_from_existing_report(stage_name: str, report_path: Path) -> StageOutcome:
+    """Create a stage outcome from a previously written JSON report."""
+    report_data = load_json(report_path)
+
+    if stage_name in {"skim-check", "template-check"}:
+        missing_batch_ids = report_data.get("missing_batch_ids", [])
+        details = {
+            "report": str(report_path),
+            "total": report_data.get("total"),
+            "ok": report_data.get("n_ok"),
+            "missing": report_data.get("n_missing"),
+            "empty": report_data.get("n_empty"),
+            "missing_batch_ids": missing_batch_ids,
+            "reused_report": True,
+        }
+        stage_ok = report_data.get("n_missing", 0) == 0 and report_data.get("n_empty", 0) == 0
+        return StageOutcome(name=stage_name, ok=stage_ok, details=details)
+
+    if stage_name == "merge-stage":
+        merged_count = report_data.get("n_merged", 0) + report_data.get("n_copied", 0)
+        failed_count = report_data.get("n_failed", 0)
+        details = {
+            "report": str(report_path),
+            "merged_count": merged_count,
+            "failed_count": failed_count,
+            "reused_report": True,
+        }
+        return StageOutcome(name=stage_name, ok=failed_count == 0, details=details)
+
+    raise RuntimeError(f"Unsupported stage report type: {stage_name}")
 
 
 def valid_manifest(path: Path) -> bool:
@@ -414,6 +480,7 @@ def run_skim_check(manifest_path: Path, report_path: Path, dry_run: bool) -> Sta
     report = check_all_skims(manifest, do_root_check=False, verbose=True)
 
     serialisable = {
+        "generated_at": datetime.now().isoformat(),
         "manifest_path": report.manifest_path,
         "total": report.total,
         "n_ok": report.n_ok,
@@ -467,6 +534,7 @@ def run_template_check(manifest_path: Path, report_path: Path, dry_run: bool) ->
     report = check_all_templates(manifest, verbose=True)
 
     serialisable = {
+        "generated_at": datetime.now().isoformat(),
         "manifest_path": report.manifest_path,
         "total": report.total,
         "n_ok": report.n_ok,
@@ -503,21 +571,23 @@ def run_template_check(manifest_path: Path, report_path: Path, dry_run: bool) ->
 
 def resolve_paths(condor_dir: Path, year: str, status_json_override: str | None) -> ControllerPaths:
     """Resolve all controller artifact paths for a run."""
+    bookkeeping_dir = condor_dir.parent / "output" / "bookkeeping"
     status_name = status_json_override or f"controller_status_{year}.json"
 
     return ControllerPaths(
+        bookkeeping_dir=bookkeeping_dir,
         manifest=condor_dir / f"manifest_{year}.json",
         submission=condor_dir / f"submission_{year}.sub",
-        skim_report=condor_dir / f"skim_report_{year}.json",
+        skim_report=bookkeeping_dir / f"skim_report_{year}.json",
         template_manifest=condor_dir / f"template_manifest_{year}.json",
         template_submission=condor_dir / f"template_submission_{year}.sub",
-        template_report=condor_dir / f"template_report_{year}.json",
-        merge_report=condor_dir / f"merge_report_{year}.json",
+        template_report=bookkeeping_dir / f"template_report_{year}.json",
+        merge_report=bookkeeping_dir / f"merge_report_{year}.json",
         skim_missing_manifest=condor_dir / f"manifest_missing_skims_{year}.json",
         skim_resubmit_submission=condor_dir / f"submission_missing_skims_{year}.sub",
         template_missing_manifest=condor_dir / f"template_manifest_missing_{year}.json",
         template_resubmit_submission=condor_dir / f"template_submission_missing_{year}.sub",
-        status_json=condor_dir / status_name,
+        status_json=bookkeeping_dir / status_name,
     )
 
 
@@ -586,6 +656,7 @@ def main() -> int:
         "dry_run": args.dry_run,
         "resubmit_missing": args.resubmit_missing,
         "auto_submit": args.auto_submit,
+        "bookkeeping_dir": str(paths.bookkeeping_dir),
         "stages": {},
     }
 
@@ -601,39 +672,70 @@ def main() -> int:
     print(f"Resubmit missing:  {'yes' if args.resubmit_missing else 'no'}")
     print(f"Force regen:       {'yes' if args.force_regenerate_manifests else 'no'}")
     print(f"Campaign:          {CAMPAIGN}")
+    print(f"Bookkeeping dir:   {paths.bookkeeping_dir}")
     print("=" * 88)
+
+    if args.dry_run:
+        print(f"  DRY-RUN: would ensure bookkeeping directory exists: {paths.bookkeeping_dir}")
+    else:
+        paths.bookkeeping_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         print("\n[1/5] Preselection planning")
-        ensure_manifest(
-            manifest_path=paths.manifest,
-            condor_dir=condor_dir,
-            year=args.year,
-            all_datasets=args.all_datasets,
-            datasets=args.datasets,
-            expected_campaign=CAMPAIGN,
-            force_regenerate=args.force_regenerate_manifests,
-            dry_run=args.dry_run,
-        )
-        if not args.dry_run:
-            ensure_campaign_consistency(paths.manifest, CAMPAIGN)
-        ensure_submission(
-            submission_path=paths.submission,
-            manifest_path=paths.manifest,
-            condor_dir=condor_dir,
-            test_mode=args.test,
-            force_regenerate=args.force_regenerate_manifests,
-            dry_run=args.dry_run,
-        )
-        maybe_submit(paths.submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
-        status_payload["stages"]["preselection-planning"] = {"ok": True, "manifest": str(paths.manifest), "submission": str(paths.submission)}
+        preselection_action = choose_step_action("preselection planning")
+        if preselection_action == "run":
+            ensure_manifest(
+                manifest_path=paths.manifest,
+                condor_dir=condor_dir,
+                year=args.year,
+                all_datasets=args.all_datasets,
+                datasets=args.datasets,
+                expected_campaign=CAMPAIGN,
+                force_regenerate=args.force_regenerate_manifests,
+                dry_run=args.dry_run,
+            )
+            if not args.dry_run:
+                ensure_campaign_consistency(paths.manifest, CAMPAIGN)
+            ensure_submission(
+                submission_path=paths.submission,
+                manifest_path=paths.manifest,
+                condor_dir=condor_dir,
+                test_mode=args.test,
+                force_regenerate=args.force_regenerate_manifests,
+                dry_run=args.dry_run,
+            )
+            maybe_submit(paths.submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
+            status_payload["stages"]["preselection-planning"] = {
+                "ok": True,
+                "executed": True,
+                "manifest": str(paths.manifest),
+                "submission": str(paths.submission),
+            }
+        else:
+            print("  Preselection planning skipped by user")
+            status_payload["stages"]["preselection-planning"] = {"ok": True, "executed": False, "reason": "user-skipped"}
+            if not valid_manifest(paths.manifest):
+                print("  Stage gate: no valid preselection manifest available")
+                status_payload["stage_gate_block"] = "missing-preselection-manifest"
+                write_json(paths.status_json, status_payload, dry_run=args.dry_run)
+                return 2
 
         print("\n[2/5] Skim completeness check")
-        skim_outcome = run_skim_check(
-            manifest_path=paths.manifest,
-            report_path=paths.skim_report,
-            dry_run=args.dry_run,
-        )
+        skim_action = choose_step_action("skim completeness check", report_path=paths.skim_report)
+        if skim_action == "reuse":
+            skim_outcome = outcome_from_existing_report("skim-check", paths.skim_report)
+        elif skim_action == "run":
+            skim_outcome = run_skim_check(
+                manifest_path=paths.manifest,
+                report_path=paths.skim_report,
+                dry_run=args.dry_run,
+            )
+        else:
+            skim_outcome = StageOutcome(
+                name="skim-check",
+                ok=True,
+                details={"executed": False, "reason": "user-skipped", "report": str(paths.skim_report)},
+            )
         status_payload["stages"][skim_outcome.name] = {"ok": skim_outcome.ok, **skim_outcome.details}
 
         skim_missing_batch_ids = skim_outcome.details.get("missing_batch_ids", []) or []
@@ -664,39 +766,60 @@ def main() -> int:
                 return 2
 
         print("\n[3/5] Template planning")
-        ensure_template_manifest(
-            template_manifest_path=paths.template_manifest,
-            skim_manifest_path=paths.manifest,
-            condor_dir=condor_dir,
-            datasets=args.datasets,
-            expected_campaign=CAMPAIGN,
-            force_regenerate=args.force_regenerate_manifests,
-            dry_run=args.dry_run,
-        )
-        if not args.dry_run:
-            ensure_campaign_consistency(paths.template_manifest, CAMPAIGN)
+        template_planning_action = choose_step_action("template planning")
+        if template_planning_action == "run":
+            ensure_template_manifest(
+                template_manifest_path=paths.template_manifest,
+                skim_manifest_path=paths.manifest,
+                condor_dir=condor_dir,
+                datasets=args.datasets,
+                expected_campaign=CAMPAIGN,
+                force_regenerate=args.force_regenerate_manifests,
+                dry_run=args.dry_run,
+            )
+            if not args.dry_run:
+                ensure_campaign_consistency(paths.template_manifest, CAMPAIGN)
 
-        ensure_submission(
-            submission_path=paths.template_submission,
-            manifest_path=paths.template_manifest,
-            condor_dir=condor_dir,
-            test_mode=args.test,
-            force_regenerate=args.force_regenerate_manifests,
-            dry_run=args.dry_run,
-        )
-        maybe_submit(paths.template_submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
-        status_payload["stages"]["template-planning"] = {
-            "ok": True,
-            "template_manifest": str(paths.template_manifest),
-            "template_submission": str(paths.template_submission),
-        }
+            ensure_submission(
+                submission_path=paths.template_submission,
+                manifest_path=paths.template_manifest,
+                condor_dir=condor_dir,
+                test_mode=args.test,
+                force_regenerate=args.force_regenerate_manifests,
+                dry_run=args.dry_run,
+            )
+            maybe_submit(paths.template_submission, condor_dir=condor_dir, auto_submit=args.auto_submit, dry_run=args.dry_run)
+            status_payload["stages"]["template-planning"] = {
+                "ok": True,
+                "executed": True,
+                "template_manifest": str(paths.template_manifest),
+                "template_submission": str(paths.template_submission),
+            }
+        else:
+            print("  Template planning skipped by user")
+            status_payload["stages"]["template-planning"] = {"ok": True, "executed": False, "reason": "user-skipped"}
+            if not valid_manifest(paths.template_manifest):
+                print("  Stage gate: no valid template manifest available")
+                status_payload["stage_gate_block"] = "missing-template-manifest"
+                write_json(paths.status_json, status_payload, dry_run=args.dry_run)
+                return 3
 
         print("\n[4/5] Template completeness check")
-        template_outcome = run_template_check(
-            manifest_path=paths.template_manifest,
-            report_path=paths.template_report,
-            dry_run=args.dry_run,
-        )
+        template_check_action = choose_step_action("template completeness check", report_path=paths.template_report)
+        if template_check_action == "reuse":
+            template_outcome = outcome_from_existing_report("template-check", paths.template_report)
+        elif template_check_action == "run":
+            template_outcome = run_template_check(
+                manifest_path=paths.template_manifest,
+                report_path=paths.template_report,
+                dry_run=args.dry_run,
+            )
+        else:
+            template_outcome = StageOutcome(
+                name="template-check",
+                ok=True,
+                details={"executed": False, "reason": "user-skipped", "report": str(paths.template_report)},
+            )
         status_payload["stages"][template_outcome.name] = {"ok": template_outcome.ok, **template_outcome.details}
 
         template_missing_batch_ids = template_outcome.details.get("missing_batch_ids", []) or []
@@ -735,13 +858,23 @@ def main() -> int:
                 "reason": "skipped",
             }
         else:
-            merge_outcome = run_merge_stage(
-                template_manifest_path=paths.template_manifest,
-                merge_report_path=paths.merge_report,
-                condor_dir=condor_dir,
-                dry_run=args.dry_run,
-                skip_local_copy=args.dry_run,
-            )
+            merge_action = choose_step_action("merge stage", report_path=paths.merge_report)
+            if merge_action == "reuse":
+                merge_outcome = outcome_from_existing_report("merge-stage", paths.merge_report)
+            elif merge_action == "run":
+                merge_outcome = run_merge_stage(
+                    template_manifest_path=paths.template_manifest,
+                    merge_report_path=paths.merge_report,
+                    condor_dir=condor_dir,
+                    dry_run=args.dry_run,
+                    skip_local_copy=args.dry_run,
+                )
+            else:
+                merge_outcome = StageOutcome(
+                    name="merge-stage",
+                    ok=True,
+                    details={"executed": False, "reason": "user-skipped", "report": str(paths.merge_report)},
+                )
             status_payload["stages"]["merge-stage"] = {"ok": merge_outcome.ok, **merge_outcome.details}
 
         write_json(paths.status_json, status_payload, dry_run=args.dry_run)
