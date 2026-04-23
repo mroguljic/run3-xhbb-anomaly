@@ -604,6 +604,7 @@ def run_merge_stage(
     command = [
         "python3",
         "merge_templates.py",
+        "--merge-groups",
         "--manifest",
         template_manifest_path.name,
         "--report",
@@ -661,7 +662,7 @@ def main() -> int:
     }
 
     print("=" * 88)
-    print("Condor Controller (M1 + M2 + M3)")
+    print("Condor Controller")
     print("=" * 88)
     print(f"Year:              {args.year}")
     print(f"All datasets:      {'yes' if args.all_datasets else 'no'}")

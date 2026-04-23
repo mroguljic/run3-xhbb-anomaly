@@ -151,44 +151,61 @@ def get_sum_gen_weight(template_file_path: str) -> float:
     return sum_gen_weight
 
 
-def scale_histograms_in_directory(directory: object, scale_factor: float) -> int:
-    """Scale all TH1- and TH2-derived objects in a ROOT directory recursively."""
-
+def scale_histograms_in_file(input_root_file: str, output_root_file: str, scale_factor: float) -> int:
+    """Copy objects into a new ROOT file and scale TH1-derived objects (no subdirectories assumed)."""
     scaled_histograms = 0
-    for key in directory.GetListOfKeys():
-        obj = key.ReadObj()
+    input_tfile = ROOT.TFile.Open(input_root_file, "READ")
+    key_list = input_tfile.GetListOfKeys()
+    histos = []
 
-        if obj.InheritsFrom("TDirectory"):
-            scaled_histograms += scale_histograms_in_directory(obj, scale_factor)
-            directory.cd()
-            continue
-
-        if obj.InheritsFrom("TH1") or obj.InheritsFrom("TH2"):
-            obj.Scale(scale_factor)
-            directory.cd()
-            obj.Write(obj.GetName(), ROOT.TObject.kOverwrite)
+    for i in range(len(key_list)):
+        h = input_tfile.Get(key_list[i].GetName())
+        if h.InheritsFrom("TH1"):
+            h.Scale(scale_factor)
+            h.SetDirectory(0)
+            histos.append(h)
             scaled_histograms += 1
+        else:
+            # As it stands, we should only have histograms in the file, but this allows copying other objects
+            histos.append(h)
+    input_tfile.Close()
 
+    output_tfile = ROOT.TFile.Open(output_root_file, "RECREATE")
+    output_tfile.cd()
+    for h in histos:
+        h.Write()
+    output_tfile.Close()
     return scaled_histograms
 
 
 def scale_merged_mc_template(template_file_path: str, process: str, year: str) -> float:
-    """Scale a merged MC template file in place and return the applied factor."""
+    """Scale a merged MC template file via a new temp ROOT file and return the applied factor."""
     sum_gen_weight = get_sum_gen_weight(template_file_path)
     int_lumi = get_int_lumi(year)
     xsec = get_xsec(process)
     scale_factor = int_lumi * xsec / sum_gen_weight
 
     ROOT.gROOT.SetBatch(True)
-    root_file = ROOT.TFile.Open(template_file_path, "UPDATE")
-    if not root_file or root_file.IsZombie():
-        raise RuntimeError(f"Could not open ROOT file '{template_file_path}' for scaling")
+    temp_scaled_path: Optional[str] = None
 
-    scaled_histograms = scale_histograms_in_directory(root_file, scale_factor)
-    root_file.Close()
+    with tempfile.NamedTemporaryFile(
+        prefix=f"scaled_{process}_",
+        suffix=".root",
+        dir=str(Path(template_file_path).parent),
+        delete=False,
+    ) as temp_file_handle:
+        temp_scaled_path = temp_file_handle.name
+
+
+    scaled_histograms = scale_histograms_in_file(template_file_path, temp_scaled_path, scale_factor)
+
 
     if scaled_histograms == 0:
+        if temp_scaled_path and os.path.exists(temp_scaled_path):
+            os.remove(temp_scaled_path)
         raise RuntimeError(f"No histograms found to scale in '{template_file_path}'")
+
+    os.replace(temp_scaled_path, template_file_path)
 
     return scale_factor
 

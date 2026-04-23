@@ -12,19 +12,19 @@ br_ttbar_2l2nu = br_w_lnu**2
 
 
 xsecs = {
-    "TTTo4Q": inclusive_ttbar_xsec * br_ttbar_4q,
+    "TTto4Q": inclusive_ttbar_xsec * br_ttbar_4q,
     "TTtoLNu2Q": inclusive_ttbar_xsec * br_ttbar_lnu2q,
     "TTto2L2Nu": inclusive_ttbar_xsec * br_ttbar_2l2nu,
     "QCD-4Jets_HT-800to1000": 3010.,
     "QCD-4Jets_HT-1000to1200": 890.3,
-    "QCD-4Jets_HT-1200to1500": 127.3,
-    "QCD-4Jets_HT-1500to2000": 3010.,
+    "QCD-4Jets_HT-1200to1500": 384.8,
+    "QCD-4Jets_HT-1500to2000": 127.3.,
     "QCD-4Jets_HT-2000": 26.26,
 }
 
 int_lumi = {
     # brilcalc lumi --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /fb -i <golde_json>
-    "2024": 109.987998903 
+    "2024": 109987.998903 
 }
 
 def get_xsec(process: str) -> float:
@@ -38,7 +38,9 @@ def get_xsec(process: str) -> float:
         float: Cross section in pb
     """
     if process not in xsecs:
-        raise ValueError(f"{process} is not listed in xsecs.py. Available processes: {list(xsecs.keys())}")
+        if(process.startswith("MX")):
+            return 0.001 # 1fb for signal samples
+        raise ValueError(f"{process} is not listed in xsecs.py. Available processes: {list(xsecs.keys())}. Signal processes should start with 'MX'.")
     return xsecs[process]
 
 def get_int_lumi(year: str) -> float:
@@ -49,7 +51,7 @@ def get_int_lumi(year: str) -> float:
         year (str): Year, e.g. "2022"
     
     Returns:
-        float: Integrated luminosity in /fb
+        float: Integrated luminosity in /pb
     """
     if year not in int_lumi:
         raise ValueError(f"Int. lumi for {year} is not listed in xsecs.py. Available years: {list(int_lumi.keys())}")
