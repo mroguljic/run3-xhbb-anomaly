@@ -18,7 +18,7 @@ xsecs = {
     "QCD-4Jets_HT-800to1000": 3010.,
     "QCD-4Jets_HT-1000to1200": 890.3,
     "QCD-4Jets_HT-1200to1500": 384.8,
-    "QCD-4Jets_HT-1500to2000": 127.3.,
+    "QCD-4Jets_HT-1500to2000": 127.3,
     "QCD-4Jets_HT-2000": 26.26,
 }
 
