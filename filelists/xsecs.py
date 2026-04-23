@@ -15,6 +15,7 @@ xsecs = {
     "TTto4Q": inclusive_ttbar_xsec * br_ttbar_4q,
     "TTtoLNu2Q": inclusive_ttbar_xsec * br_ttbar_lnu2q,
     "TTto2L2Nu": inclusive_ttbar_xsec * br_ttbar_2l2nu,
+    "QCD-4Jets_HT-800to1000": 13560.,
     "QCD-4Jets_HT-800to1000": 3010.,
     "QCD-4Jets_HT-1000to1200": 890.3,
     "QCD-4Jets_HT-1200to1500": 384.8,
