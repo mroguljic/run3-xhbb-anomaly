@@ -80,7 +80,6 @@ def event_preselection(options: OptionParser) -> None:
     Args:
         options (OptionParser): Command-line options.
     """
-    print("I AM IN MAIN")
     start_time = time.time()
     analyzer = Analyzer.analyzer(options.input)
     data_flag = is_data(analyzer)
@@ -105,7 +104,7 @@ def event_preselection(options: OptionParser) -> None:
     n_met = get_n_events(analyzer)
     n_met_weighted = get_n_weighted(analyzer, data_flag)
 
-    analyzer.Cut("n_FatJet_cut","nFatJet > 1") #Avoids crashing on events with no fatjets
+    analyzer.Cut("n_FatJet_cut","nFatJet > 1") #Avoids crashing on events with <2 fatjets
     n_one_fatjet = get_n_events(analyzer)
     n_one_fatjet_weighted = get_n_weighted(analyzer, data_flag)
 

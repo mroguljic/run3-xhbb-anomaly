@@ -17,6 +17,7 @@ TEMPLATE_SELECTION = {
     "2024": {
         "h_cand_mass_min": 100,
         "h_cand_mass_max": 140,
+        "y_cand_mass_min": 40,
         "trigger_or": True,
         "h_cand_pt_min": 300,
         "y_cand_pt_min": 300,
@@ -25,8 +26,8 @@ TEMPLATE_SELECTION = {
 
 TEMPLATE_TAGGING_WPS = {
     "2024": {
-        "h_xbb_wp": 0.98,
-        "y_antiqcd_wp": 0.95,
+        "h_xbb_wp": 0.9,
+        "y_antiqcd_wp": 0.9,
     }
 }
 

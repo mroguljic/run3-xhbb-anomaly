@@ -42,21 +42,28 @@ def define_common_columns(analyzer: Analyzer, data_flag: bool, year: str) -> Non
     analyzer.Define("lead_jet_mass", "FatJet_mass[0]")
     analyzer.Define("sublead_jet_mass", "FatJet_mass[1]")
 
-
-def apply_common_selection(analyzer: Analyzer, year: str, cut_name_prefix: str) -> None:
-    """Apply common cuts that are independent of JEC variation."""
+def apply_y_mass_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
+    """Apply the Y-candidate mass cut."""
     selection = cuts.TEMPLATE_SELECTION[year]
-    analyzer.Cut(f"{cut_name_prefix}_trigger_cut", "trigger_pass")
     analyzer.Cut(
-        f"{cut_name_prefix}_h_mass_cut",
-        f"h_cand_reg_mass >= {selection['h_cand_mass_min']} && h_cand_reg_mass <= {selection['h_cand_mass_max']}",
+        f"{cut_name_prefix}_y_mass_cut",
+        f"y_cand_msd_{jec_variation} >= {selection['y_cand_mass_min']}",
     )
 
+def apply_h_mass_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
+    """Apply the H-candidate mass cut."""
+    selection = cuts.TEMPLATE_SELECTION[year]
+    analyzer.Cut(
+        f"{cut_name_prefix}_h_mass_cut_{jec_variation}",
+        f"h_cand_msd_{jec_variation} >= {selection['h_cand_mass_min']} && h_cand_msd_{jec_variation} <= {selection['h_cand_mass_max']}",
+    )
 
 def apply_selection_for_variation(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
     """Apply pT cuts for a specific JEC variation."""
     apply_h_pt_cut(analyzer, year, jec_variation, cut_name_prefix)
     apply_y_pt_cut(analyzer, year, jec_variation, cut_name_prefix)
+    apply_h_mass_cut(analyzer, year, jec_variation, cut_name_prefix)
+    apply_y_mass_cut(analyzer, year, jec_variation, cut_name_prefix)
 
 
 def apply_h_pt_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
@@ -197,19 +204,23 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     selection_root = analyzer.GetActiveNode()
 
     analyzer.SetActiveNode(selection_root)
-    apply_common_selection(analyzer, year, "template")
-    common_no_pt_node = analyzer.GetActiveNode() # Node without pT cuts that are JEC-variation dependent
-    post_h_mass = get_n_weighted(analyzer, data_flag, "event_weight")
-
-    analyzer.SetActiveNode(selection_root)
     analyzer.Cut("template_cutflow_trigger", "trigger_pass")
     post_trigger = get_n_weighted(analyzer, data_flag, "event_weight")
 
-    analyzer.SetActiveNode(common_no_pt_node)
-    apply_h_pt_cut(analyzer, year, "nom", "template_nom") # Diagnostics histograms are calculated only for the nominal JEC variation
+    common_no_pt_node = analyzer.GetActiveNode() # Node without pT/mass cuts that are JEC-variation dependent
+
+    #Cuts for diagnostics histograms that are calculated only for nominal JEC variation
+    #pT
+    apply_h_pt_cut(analyzer, year, "nom", "template_nom")
     post_h_pt = get_n_weighted(analyzer, data_flag, "event_weight")
     apply_y_pt_cut(analyzer, year, "nom", "template_nom")
     post_y_pt = get_n_weighted(analyzer, data_flag, "event_weight")
+
+    #mass
+    apply_h_mass_cut(analyzer, year, "nom", "template_nom")
+    post_h_mass = get_n_weighted(analyzer, data_flag, "event_weight")
+    apply_y_mass_cut(analyzer, year, "nom", "template_nom")
+    post_y_mass = get_n_weighted(analyzer, data_flag, "event_weight")
 
     nominal_common_node = analyzer.GetActiveNode()
 
@@ -240,9 +251,10 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
 
     extra_cutflow_bins = [
         ("Post trigger", post_trigger),
-        ("Post H mass", post_h_mass),
         ("Post H pT", post_h_pt),
         ("Post Y pT", post_y_pt),
+        ("Post H mass", post_h_mass),
+        ("Post Y mass", post_y_mass),
     ]
     extra_cutflow_bins.extend((f"Region {region_name}", region_yields[region_name]) for region_name in region_yields)
     template_cutflow = make_extended_cutflow_histogram(selection_cutflow, extra_cutflow_bins)
