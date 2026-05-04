@@ -751,7 +751,7 @@ def main() -> int:
                     manifest_path=paths.skim_missing_manifest,
                     condor_dir=condor_dir,
                     test_mode=args.test,
-                    force_regenerate=args.force_regenerate_manifests,
+                    force_regenerate=True, # Always regenerate resubmit submission to ensure it matches the missing manifest
                     dry_run=args.dry_run,
                 )
                 maybe_submit(
@@ -835,7 +835,7 @@ def main() -> int:
                     manifest_path=paths.template_missing_manifest,
                     condor_dir=condor_dir,
                     test_mode=args.test,
-                    force_regenerate=args.force_regenerate_manifests,
+                    force_regenerate=True,
                     dry_run=args.dry_run,
                 )
                 maybe_submit(
