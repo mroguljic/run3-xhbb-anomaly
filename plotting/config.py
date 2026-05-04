@@ -118,6 +118,24 @@ HISTOGRAMS_TO_PLOT = {
         "y_log_range": None,
         "rebin": 1,
     },
+    "FS_m_jj": {
+        "label": r"$m_{jj}$ (GeV)",
+        "blind": False,
+        "log_y": True,
+        "x_range": [400,3000],
+        "y_range": None,
+        "y_log_range": None,
+        "rebin": 1,
+    },
+    "FS_m_jy": {
+        "label": r"$m_{jY}$ (GeV)",
+        "blind": False,
+        "log_y": True,
+        "x_range": [30,400],
+        "y_range": None,
+        "y_log_range": None,
+        "rebin": 1,
+    },
 }
 
 # https://cms-analysis.docs.cern.ch/guidelines/plotting/colors/#categorical-data-eg-1d-stackplots

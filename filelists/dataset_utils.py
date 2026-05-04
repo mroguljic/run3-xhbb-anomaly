@@ -66,7 +66,7 @@ if __name__ == "__main__":
     example_datasets = {}
     example_datasets["TTTo4Q"] = mc_bkg["2024"]["TTbar"]["TTto4Q"]
     example_datasets["XToYHto4b_MX1800_MY100"] = mc_sig["2024"]["XtoYHto4b"]["MX1800_MY100"]
-    example_datasets["JetMET_Run2024C"] = jetmet["2024"]["JetMET"]["Run2024C"][0] 
+    example_datasets["JetMET_Run2024C"] = jetmet["2024"]["JetMET"]["JetMET0_2024C_v1"] 
 
 
     test_dir = "test_files"

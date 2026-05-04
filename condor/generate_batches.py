@@ -219,12 +219,7 @@ Examples:
         if year in jetmet:
             for category in jetmet[year]:
                 for dataset_name in jetmet[year][category]:
-                    if isinstance(jetmet[year][category][dataset_name], list):
-                        # Data has multiple entries per dataset
-                        for entry in jetmet[year][category][dataset_name]:
-                            datasets_to_process[f"{dataset_name}_{len(datasets_to_process)}"] = entry
-                    else:
-                        datasets_to_process[dataset_name] = jetmet[year][category][dataset_name]
+                    datasets_to_process[dataset_name] = jetmet[year][category][dataset_name]
     else:
         if not args.datasets:
             parser.error("Either --datasets or --all-datasets must be specified")
@@ -282,6 +277,10 @@ Examples:
     for dataset_name, das_path in sorted(datasets_to_process.items()):
         print(f"Processing: {dataset_name}")
         print(f"  DAS path: {das_path}")
+
+        if not isinstance(das_path, str):
+            print(f"  ERROR: DAS path for '{dataset_name}' must be a string, got {type(das_path).__name__}\n")
+            continue
         
         try:
             # Query DAS

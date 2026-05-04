@@ -38,7 +38,7 @@ from filelists.xsecs import get_int_lumi, get_xsec
 import ROOT
 
 DEFAULT_GROUP_RULES = [
-    "Run2024=Run2024*",
+    "Run2024=JetMET*_2024*",
     "QCD=QCD*",
     "TT=TT*",
 ]
@@ -126,8 +126,8 @@ def run_hadd(output_file: str, inputs: List[str]) -> None:
 
 
 def is_data_process(process: str) -> bool:
-    """Return True for data process names like Run2024C."""
-    return process.startswith("Run20")
+    """Return True for data process names like Run2024C or JetMET0_2024C_v1."""
+    return process.startswith("Run20") or process.startswith("JetMET")
 
 
 def get_sum_gen_weight(template_file_path: str) -> float:
@@ -476,7 +476,7 @@ Examples:
   python3 merge_templates.py --manifest template_manifest_2024.json --dry-run
   python3 merge_templates.py --manifest template_manifest_2024.json --processes TTto4Q
     python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups
-    python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups --group-rule Run2024=Run2024* --group-rule TT=TT*
+    python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups --group-rule Run2024=JetMET*_2024* --group-rule TT=TT*
         """,
     )
     parser.add_argument("--manifest", required=True, help="Path to template manifest JSON")
@@ -489,13 +489,13 @@ Examples:
     parser.add_argument(
         "--merge-groups",
         action="store_true",
-        help="Also produce grouped merges using wildcard rules (defaults: Run2024, QCD, TT)",
+        help="Also produce grouped merges using wildcard rules (defaults: Run2024=JetMET*_2024*, QCD, TT)",
     )
     parser.add_argument(
         "--group-rule",
         action="append",
         default=None,
-        help="Grouping rule TARGET=PATTERN[,PATTERN...] (repeatable), e.g. Run2024=Run2024*",
+        help="Grouping rule TARGET=PATTERN[,PATTERN...] (repeatable), e.g. Run2024=JetMET*_2024*",
     )
     parser.add_argument(
         "--group-output-name-template",
