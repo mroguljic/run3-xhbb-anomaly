@@ -37,6 +37,7 @@ XRD_ROOT = "root://cmsxrootd.fnal.gov"
 EOS_MKDIR = f"eos {EOS_ROOT} mkdir"
 EOS_LS = f"eos {EOS_ROOT} ls"
 EOS_CP = f"eos {EOS_ROOT} cp"
+EOS_MV = f"eos {EOS_ROOT} mv"
 
 def get_xrdcp_command() -> str:
     """

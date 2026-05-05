@@ -153,7 +153,7 @@ CMS_COLORS = {
 PROCESSES = {
     "data": {
         "type": "data",
-        "file": "templates_Run2024.root",
+        "file": "templates_JetMET2024.root",
         "label": "Data",
         "color": "black"
     },
