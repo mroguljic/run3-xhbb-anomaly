@@ -7,7 +7,7 @@ stages:
     name: gitlab-registry.cern.ch/ci-tools/docker-image-builder
     entrypoint: [""]
   variables:
-    DOCKERFILE: docker/Dockerfile
+    DOCKERFILE: Docker/Dockerfile
     TAG: master
     DESTINATION: "${CI_REGISTRY_IMAGE}:${TAG}"
   before_script:
