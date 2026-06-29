@@ -18,7 +18,6 @@ TEMPLATE_SELECTION = {
         "h_cand_mass_min": 100,
         "h_cand_mass_max": 140,
         "y_cand_mass_min": 40,
-        "trigger_or": True,
         "h_cand_pt_min": 300,
         "y_cand_pt_min": 300,
     }
@@ -44,6 +43,5 @@ triggers = {
     "2024": [
         "HLT_AK8DiPFJet250_250_SoftDropMass40",
         "HLT_AK8PFJet250_SoftDropMass40_PNetBB0p06",
-        "HLT_AK8DiPFJet250_250_MassSD30",
     ]
 }
