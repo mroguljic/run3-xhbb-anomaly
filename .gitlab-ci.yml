@@ -14,12 +14,17 @@ stages:
     - mkdir -p /kaniko/.docker
     - |
       echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-  script:
-    - /kaniko/executor
-      --context $CI_PROJECT_DIR
-      --dockerfile ${DOCKERFILE}
-      --destination ${DESTINATION}
-      --force
+script:
+    - echo "CI_PROJECT_DIR=$CI_PROJECT_DIR"
+    - pwd
+    - ls -la
+    - ls -la "$CI_PROJECT_DIR"
+    - ls -la "$CI_PROJECT_DIR/Docker"
+    - /kaniko/executor \
+        --context "dir://${CI_PROJECT_DIR}" \
+        --dockerfile "${CI_PROJECT_DIR}/Docker/Dockerfile" \
+        --destination "${DESTINATION}" \
+        --force
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
 
