@@ -4,7 +4,6 @@ import time
 from optparse import OptionParser
 from TIMBER.Tools import Common
 from TIMBER import Analyzer
-from TIMBER.Analyzer import Correction
 import cuts
 import TIMBER.Tools.AutoJetID as AutoJetID
 import TIMBER.Tools.AutoJetVetoMap as AutoJetVetoMap
@@ -13,7 +12,6 @@ from analysis_utils import get_n_events, get_n_weighted, is_data
 from corrections import corrections_paths
 from preselection_branches import get_preselection_snapshot_columns
 from typing import Union
-import correctionlib._core as core
 
 
 def detect_era(input_path: str) -> str:
@@ -118,13 +116,6 @@ def event_preselection(options: OptionParser) -> None:
     AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.corrections[year]["JEC_AK4"], corrections_paths.corrections[year]["JEC_AK8"]], dataEra=era, verbose=False)
     AutoJME.AutoJME_mSD(analyzer, jec_path=corrections_paths.corrections[year]["JEC_AK4"], dataEra=era, verbose=False)
     AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
-
-    pileup_file = corrections_paths.corrections[year]["Pileup"]
-    cset_pileup = core.CorrectionSet.from_file(pileup_file)
-    collisions  = list(cset_pileup); assert(len(collisions) == 1); collisions = collisions[0] # Should only ever be one key (collision goldenJSON)
-    pu = Correction("PileUp_Corr", "TIMBER/Framework/src/PileUp_correctionlib_weight.cc", [pileup_file, collisions, analyzer.isData], corrtype="weight")
-    evalargs = {"Pileup_nTrueInt": "Pileup_nTrueInt"}
-    analyzer.AddCorrection(pu, evalargs)
 
     # We use JES__up in MC because it has the highest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
     if data_flag:
