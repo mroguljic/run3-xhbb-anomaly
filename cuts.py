@@ -25,8 +25,8 @@ TEMPLATE_SELECTION = {
 
 TEMPLATE_TAGGING_WPS = {
     "2024": {
-        "h_xbb_wp": 0.9,
-        "y_antiqcd_wp": 0.9,
+        "h_xbb_wp": 0.99,
+        "y_antiqcd_wp": 0.8,
     }
 }
 

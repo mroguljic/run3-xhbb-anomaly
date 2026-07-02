@@ -10,14 +10,13 @@ M_JY_BINS = (112, 40, 600)
 
 
 SCAN_CONFIG = {
-    "xbb_fixed": 0.95,
-    "antiqcd_fixed": 0.95,
+    "xbb_fixed": 0.99,
+    "antiqcd_fixed": 0.5,
 }
 
 import numpy as np
-antiqcd_vals = np.arange(0.0, 1.0, 0.045)
-xbb_vals = np.arange(0.0, 0.89, 0.045)
-xbb_vals = np.append(xbb_vals, np.arange(0.9, 1.0, 0.01)) #increase density near optimum value
+antiqcd_vals = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+xbb_vals = [0.975, 0.99] # These have SFs ready https://indico.cern.ch/event/1602300/contributions/6751293/attachments/3157105/5609849/Run-3%20GloParT%20TXbb%20Calibration%20with%20Zbb%20(Updated).pdf
 
 SCAN_CONFIG["xbb_scan_points"] = xbb_vals
 SCAN_CONFIG["antiqcd_scan_points"] = antiqcd_vals
