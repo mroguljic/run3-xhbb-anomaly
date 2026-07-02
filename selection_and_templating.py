@@ -166,8 +166,8 @@ def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
         analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_mass", ";leading jet mass [GeV];Events", *JET_MASS_BINS), "lead_jet_mass", "event_weight"),
         analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_mass", ";subleading jet mass [GeV];Events", *JET_MASS_BINS), "sublead_jet_mass", "event_weight"),
         analyzer.DataFrame.Histo1D((f"{prefix}m_jj", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}m_jy", ";m_{jy} [GeV];Events", *M_JY_BINS), "y_cand_reg_mass", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_reg_mass", "event_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}m_jy", ";m_{jy} [GeV];Events", *M_JY_BINS), "y_cand_msd_nom", "event_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_msd_nom", "event_weight"),
     ]
 
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
@@ -192,16 +192,33 @@ def book_template(analyzer: Analyzer, region_name: str, variation: str) -> objec
     return analyzer.DataFrame.Histo2D(
         (f"template_{region_name}_{variation}", ";m_{jj} [GeV];m_{jy} [GeV]", *M_JJ_BINS, *M_JY_BINS),
         f"m_jj_{variation}",
-        "y_cand_reg_mass",
+        f"y_cand_msd_{variation}",
         "event_weight",
     )
 
 
 def region_expression(h_region: str, y_region: str, year: str) -> str:
     """Return the region cut expression for the H and Y tag categories."""
-    working_points = cuts.TEMPLATE_TAGGING_WPS[year]
-    h_cut = f"h_cand_xbb > {working_points['h_xbb_wp']}" if h_region == "Pass" else f"h_cand_xbb <= {working_points['h_xbb_wp']}"
-    y_cut = f"y_cand_antiqcd > {working_points['y_antiqcd_wp']}" if y_region == "Signal" else f"y_cand_antiqcd <= {working_points['y_antiqcd_wp']}"
+    boundaries = cuts.TEMPLATE_REGION_BOUNDARIES[year]
+    h_lower, h_upper = boundaries[h_region]
+    y_lower, y_upper = boundaries[y_region]
+    
+    # Build H candidate cut
+    h_cut_parts = []
+    if h_lower is not None:
+        h_cut_parts.append(f"h_cand_xbb > {h_lower}")
+    if h_upper is not None:
+        h_cut_parts.append(f"h_cand_xbb <= {h_upper}")
+    h_cut = " && ".join(h_cut_parts)
+    
+    # Build Y candidate cut
+    y_cut_parts = []
+    if y_lower is not None:
+        y_cut_parts.append(f"y_cand_antiqcd > {y_lower}")
+    if y_upper is not None:
+        y_cut_parts.append(f"y_cand_antiqcd <= {y_upper}")
+    y_cut = " && ".join(y_cut_parts)
+    
     return f"({h_cut}) && ({y_cut})"
 
 

@@ -26,7 +26,17 @@ TEMPLATE_SELECTION = {
 TEMPLATE_TAGGING_WPS = {
     "2024": {
         "h_xbb_wp": 0.99,
-        "y_antiqcd_wp": 0.8,
+        "y_antiqcd_wp": 0.6,
+    }
+}
+
+# Region boundaries as (lower, upper) tuples. None means unbounded.
+TEMPLATE_REGION_BOUNDARIES = {
+    "2024": {
+        "Pass": (0.99, None),        # h_cand_xbb > 0.99
+        "Fail": (0.5, 0.99),         # 0.5 < h_cand_xbb <= 0.99
+        "Signal": (0.6, None),       # y_cand_antiqcd > 0.6
+        "Control": (0.2, 0.6),       # 0.2 < y_cand_antiqcd <= 0.6
     }
 }
 
