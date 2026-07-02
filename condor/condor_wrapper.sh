@@ -37,7 +37,7 @@ voms-proxy-info
 # ============================================================================
 
 echo "Cloning repository..."
-git clone --quiet https://github.com/mroguljic/run3-xhbb-anomaly.git
+git clone --quiet https://gitlab.cern.ch/mrogulji/run3-xhbb-anomaly
 if [[ ! -d "${REPO_DIR}" ]]; then
     echo "ERROR: Failed to clone repository"
     exit 1
