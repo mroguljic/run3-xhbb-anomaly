@@ -3,12 +3,18 @@
 import time
 from optparse import OptionParser
 from typing import Union
+from collections import OrderedDict
+import re
 
 import ROOT
 from TIMBER import Analyzer
+from TIMBER.Analyzer import Correction
 
-from analysis_utils import get_n_weighted, is_data
+from analysis_utils import get_n_weighted, is_data, get_pdf_errtype
 import cuts
+
+import correctionlib._core as core
+from corrections import corrections_paths
 
 # N_BINS, MIN, MAX
 M_JJ_BINS = (66, 700, 4000)
@@ -18,6 +24,7 @@ JET_ETA_BINS = (50, -2.5, 2.5)
 JET_PHI_BINS = (32, -3.2, 3.2)
 JET_MASS_BINS = (80, 0, 300)
 SCORE_BINS = (50, 0, 1)
+WEIGHT_BINS = (50, 0, 2)
 TEMPLATE_VARIATIONS = ("nom", "JES__up", "JES__down", "JER__up", "JER__down")
 
 
@@ -130,6 +137,20 @@ def make_extended_cutflow_histogram(source_histogram: ROOT.TH1, extra_bins: list
 
     return histogram
 
+def book_systematic_weights(analyzer: Analyzer) -> list:
+    """Book histograms for the systematic uncertainty event weights."""
+    return [
+        analyzer.DataFrame.Histo1D((f"SYST_pileup_weight_up", ";Pileup weight up;Events", *WEIGHT_BINS), "PileUp_Corr__up"),
+        analyzer.DataFrame.Histo1D((f"SYST_pileup_weight_down", ";Pileup weight down;Events", *WEIGHT_BINS), "PileUp_Corr__down"),
+        analyzer.DataFrame.Histo1D((f"SYST_pdf_weight_up", ";Pileup weight up;Events", *WEIGHT_BINS), "Pdfweight__up"),
+        analyzer.DataFrame.Histo1D((f"SYST_pdf_weight_down", ";Pileup weight down;Events", *WEIGHT_BINS), "Pdfweight__down"),
+        analyzer.DataFrame.Histo1D((f"SYST_ISR_weight_up", ";ISR weight up;Events", *WEIGHT_BINS), "ISRunc__up"),
+        analyzer.DataFrame.Histo1D((f"SYST_ISR_weight_down", ";ISR weight down;Events", *WEIGHT_BINS), "ISRunc__down"),
+        analyzer.DataFrame.Histo1D((f"SYST_FSR_weight_up", ";FSR weight up;Events", *WEIGHT_BINS), "FSRunc__up"),
+        analyzer.DataFrame.Histo1D((f"SYST_FSR_weight_down", ";FSR weight down;Events", *WEIGHT_BINS), "FSRunc__down"),
+        analyzer.DataFrame.Histo1D((f"SYST_QCDscale_weight_up", ";QCD scale weight up;Events", *WEIGHT_BINS), "QCDscale_uncert__up"),
+        analyzer.DataFrame.Histo1D((f"SYST_QCDscale_weight_down", ";QCD scale weight down;Events", *WEIGHT_BINS), "QCDscale_uncert__down"),
+    ]
 
 def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
     """Book shared diagnostic histograms with a configurable name prefix."""
@@ -148,7 +169,6 @@ def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
         analyzer.DataFrame.Histo1D((f"{prefix}m_jy", ";m_{jy} [GeV];Events", *M_JY_BINS), "y_cand_reg_mass", "event_weight"),
         analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_reg_mass", "event_weight"),
     ]
-
 
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
     """Book nominal diagnostics after the common selection and before region splits."""
@@ -224,6 +244,49 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
 
     nominal_common_node = analyzer.GetActiveNode()
 
+    if not data_flag:
+        ###############################################################################################################
+        #                                                   Corrections                                               #
+        ###############################################################################################################
+        # Pileup
+        pileup_file = corrections_paths.corrections[year]["Pileup"]
+        cset_pileup = core.CorrectionSet.from_file(pileup_file)
+        collisions  = list(cset_pileup); assert(len(collisions) == 1); collisions = collisions[0] # Should only ever be one key (collision goldenJSON)
+        pu = Correction("PileUp_Corr", "TIMBER/Framework/src/PileUp_correctionlib_weight.cc", [pileup_file, collisions, analyzer.isData], corrtype="weight")
+        evalargs = {"Pileup_nTrueInt": "Pileup_nTrueInt"}
+        analyzer.AddCorrection(pu, evalargs)
+
+        # PDF
+        errtype = get_pdf_errtype(analyzer.lhaid)
+        analyzer.AddCorrection(
+            Correction('Pdfweight','./TIMBER_modules/PDFWeight.cc',[errtype],corrtype='uncert')
+        )
+
+        # Parton shower weights 
+        #	- https://twiki.cern.ch/twiki/bin/viewauth/CMS/TopSystematics#Parton_shower_uncertainties
+        #	- "Default" variation: https://twiki.cern.ch/twiki/bin/view/CMS/HowToPDF#Which_set_of_weights_to_use
+        #	- https://github.com/mroguljic/Hgamma/blob/409622121e8ab28bc1072c6d8981162baf46aebc/templateMaker.py#L210
+        analyzer.Define("ISR__up","PSWeight[2]")
+        analyzer.Define("ISR__down","PSWeight[0]")
+        analyzer.Define("FSR__up","PSWeight[3]")
+        analyzer.Define("FSR__down","PSWeight[1]")
+        ISRcorr = Correction("ISRunc", "TIMBER/Framework/TopPhi_modules/BranchCorrection.cc", corrtype='uncert', mainFunc='evalUncert')
+        analyzer.AddCorrection(ISRcorr, evalArgs={'valUp':'ISR__up','valDown':'ISR__down'})
+        FSRcorr = ISRcorr.Clone("FSRunc")
+        analyzer.AddCorrection(FSRcorr, evalArgs={'valUp':'FSR__up','valDown':'FSR__down'})
+
+        # QCD renormalization and factorization scales, following recommendation from B2G GEN contact report
+        # See: https://indico.cern.ch/event/938672/contributions/3943718/attachments/2073936/3482265/MC_ContactReport_v3.pdf (slide 27)
+        QCDScaleUncert = Correction('QCDscale_uncert', './TIMBER_modules/LHEScaleWeights.cc', corrtype='uncert', mainFunc='evalUncert')
+        analyzer.AddCorrection(QCDScaleUncert, evalArgs={'LHEScaleWeights':'LHEScaleWeight'})
+
+        # Have TIMBER automatically create the weight columns based on the registered Corrections. 
+        # Pass in column "event_weight" == genWeight (if MC, else 1.0) as an extra multiplicative factor to the corrections. 
+        analyzer.MakeWeightCols(extraNominal='event_weight') 
+
+        # Book histograms of the weights
+        systematic_weight_histograms = book_systematic_weights(analyzer)
+
     inclusive_histograms = book_inclusive_diagnostics(analyzer) # Inclusive == before region split
     region_histograms = []
     region_yields = {}
@@ -262,6 +325,8 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     output_file = ROOT.TFile(output_file_path, "RECREATE")
     write_histograms(output_file, inclusive_histograms)
     write_histograms(output_file, region_histograms)
+    if not data_flag:
+        write_histograms(output_file, systematic_weight_histograms)
     template_cutflow.Write()
     output_file.Close()
 
