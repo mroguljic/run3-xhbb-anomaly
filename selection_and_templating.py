@@ -261,8 +261,7 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
 
     nominal_common_node = analyzer.GetActiveNode()
 
-    #if not data_flag:
-    if False: # Temporarily disabled while running on old skims
+    if not data_flag:
         ###############################################################################################################
         #                                                   Corrections                                               #
         ###############################################################################################################
