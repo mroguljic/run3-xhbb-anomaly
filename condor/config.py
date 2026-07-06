@@ -33,11 +33,24 @@ LOCAL_MERGED_TEMPLATES_DIR = "output/templates/merged"
 EOS_ROOT = "root://cmseos.fnal.gov"
 XRD_ROOT = "root://cmsxrootd.fnal.gov"
 
-# EOS command aliases for operations on /store
-EOS_MKDIR = f"eos {EOS_ROOT} mkdir"
-EOS_LS = f"eos {EOS_ROOT} ls"
-EOS_CP = f"eos {EOS_ROOT} cp"
-EOS_MV = f"eos {EOS_ROOT} mv"
+
+def get_xrdfs_mkdir_command(store_dir: str) -> list:
+    """
+    Build an ``xrdfs mkdir -p`` command for creating an EOS directory.
+
+    Uses xrdfs (XRootD client) rather than the ``eos`` CLI, since the latter
+    is only installed on LPC login nodes and not inside the TIMBER/analysis
+    singularity images that condor scripts run in.
+
+    Args:
+        store_dir (str): Bare /store/... directory path.
+
+    Returns:
+        list: Command argv suitable for subprocess.run.
+    """
+    host = EOS_ROOT.replace("root://", "").rstrip("/")
+    return ["xrdfs", host, "mkdir", "-p", store_dir]
+
 
 def get_xrdcp_command() -> str:
     """

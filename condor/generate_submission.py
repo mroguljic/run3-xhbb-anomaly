@@ -22,7 +22,8 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from condor.config import CAMPAIGN, EOS_LS, EOS_MKDIR
+from condor.check_skim_outputs import stat_eos_file
+from condor.config import CAMPAIGN, get_xrdfs_mkdir_command
 
 
 # ============================================================================
@@ -64,11 +65,8 @@ queue BATCH_ID from (
 
 def eos_directory_exists(store_dir: str) -> bool:
     """Check whether an EOS directory already exists."""
-    import subprocess
-
-    cmd = f"{EOS_LS} {store_dir}"
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    return result.returncode == 0
+    exists, _, _ = stat_eos_file(store_dir)
+    return exists
 
 
 def create_output_directory(output_xrd_path: str) -> str:
@@ -79,15 +77,14 @@ def create_output_directory(output_xrd_path: str) -> str:
     """
     import subprocess
     from pathlib import Path
-    
+
     store_path = output_xrd_path.replace('root://cmseos.fnal.gov', '')
     store_dir = str(Path(store_path).parent)
 
     if eos_directory_exists(store_dir):
         return "exists"
-    
-    cmd = f"{EOS_MKDIR} -p {store_dir}"
-    result = subprocess.run(cmd, shell=True, capture_output=True)
+
+    result = subprocess.run(get_xrdfs_mkdir_command(store_dir), capture_output=True)
     if result.returncode == 0:
         return "created"
     return "failed"
@@ -95,24 +92,19 @@ def create_output_directory(output_xrd_path: str) -> str:
 
 def check_output_exists(output_xrd_path: str) -> bool:
     """
-    Check if output file exists on XRD storage using eosls.
-    
+    Check if output file exists on XRD storage using xrdfs stat.
+
     Args:
         output_xrd_path (str): XRD URL path (root://cmseos.fnal.gov/store/...)
-    
+
     Returns:
         bool: True if file exists, False otherwise
     """
-    import subprocess
-    
     try:
         # Extract /store path from XRD URL
         store_path = output_xrd_path.replace('root://cmseos.fnal.gov', '')
-        
-        # Use eosls to check if file exists
-        cmd = f"{EOS_LS} {store_path}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.returncode == 0
+        exists, _, _ = stat_eos_file(store_path)
+        return exists
     except Exception:
         # If we can't check, assume it doesn't exist (conservative)
         return False

@@ -33,7 +33,7 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.check_template_outputs import stat_eos_file, store_path_from_eos_url
-from condor.config import EOS_MKDIR, LOCAL_MERGED_TEMPLATES_DIR, OUTPUT, get_store_eos_path
+from condor.config import LOCAL_MERGED_TEMPLATES_DIR, OUTPUT, get_store_eos_path, get_xrdfs_mkdir_command
 from filelists.xsecs import get_int_lumi, get_xsec
 import ROOT
 
@@ -102,9 +102,8 @@ def ensure_eos_directory(output_eos_path: str) -> None:
     """Create EOS parent directory for output if missing."""
     store_path = store_path_from_eos_url(output_eos_path)
     parent_dir = str(Path(store_path).parent)
-    command = f"{EOS_MKDIR} -p {parent_dir}"
 
-    completed = subprocess.run(command, shell=True, capture_output=True, text=True)
+    completed = subprocess.run(get_xrdfs_mkdir_command(parent_dir), capture_output=True, text=True)
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "Failed to create EOS directory")
 
