@@ -23,7 +23,7 @@ JET_PT_BINS = (100, 300, 2000)
 JET_ETA_BINS = (50, -2.5, 2.5)
 JET_PHI_BINS = (32, -3.2, 3.2)
 JET_MASS_BINS = (80, 0, 300)
-SCORE_BINS = (50, 0, 1)
+SCORE_BINS = (1000, 0, 1)
 WEIGHT_BINS = (50, 0, 2)
 TEMPLATE_VARIATIONS = ("nom", "JES__up", "JES__down", "JER__up", "JER__down")
 
