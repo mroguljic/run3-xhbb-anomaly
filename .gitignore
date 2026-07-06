@@ -5,3 +5,11 @@ filelists/test_files/
 filelists/__pycache__/
 *root
 testing_scripts
+*.md
+condor/*json
+condor/logs
+condor/docker*
+condor/*sub
+output/*
+tagger_studies/templates/*
+tagger_studies/roc/*
