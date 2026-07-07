@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, OUTPUT, get_store_eos_path
 from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet
+from filelists.dataset_utils import DASGOCLIENT_PATH
 
 
 # ============================================================================
@@ -61,8 +62,8 @@ def query_das_files(dataset_path: str) -> List[Tuple[str, int]]:
         RuntimeError: If DAS query fails
     """
     try:
-        command = f'dasgoclient -query="file dataset={dataset_path}" -json'
-        result = subprocess.check_output(command, shell=True, text=True)
+        command = [DASGOCLIENT_PATH, f"-query=file dataset={dataset_path}", "-json"]
+        result = subprocess.check_output(command, text=True)
         
         files = json.loads(result)
         file_list = []

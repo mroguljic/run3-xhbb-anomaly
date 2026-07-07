@@ -46,9 +46,7 @@ TAGGERS = {
     },
 }
 
-# merge_templates.py is invoked with cwd=condor/, so its LOCAL_MERGED_TEMPLATES_DIR
-# ("output/templates/merged") resolves under condor/ in practice.
-DEFAULT_INPUT_DIR = Path(__file__).parent.parent / "condor" / LOCAL_MERGED_TEMPLATES_DIR
+DEFAULT_INPUT_DIR = Path(LOCAL_MERGED_TEMPLATES_DIR)
 
 
 def efficiency_curve(bin_contents: np.ndarray, bin_edges: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -135,7 +133,12 @@ def main() -> int:
         default=DEFAULT_INPUT_DIR,
         help=f"Directory with merged templates_<process>.root files (default: {DEFAULT_INPUT_DIR})",
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("tagger_studies/roc"), help="Directory to save ROC plots")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(__file__).resolve().parent / "roc",
+        help="Directory to save ROC plots",
+    )
     parser.add_argument(
         "--taggers",
         nargs="+",

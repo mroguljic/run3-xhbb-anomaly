@@ -4,9 +4,11 @@ Plotting configuration for template histograms.
 
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 # Input and output directories
-DEFAULT_TEMPLATE_INPUT_DIR = Path("condor/output/templates")
-OUTPUT_PLOTS_DIR = Path("output/plots")
+DEFAULT_TEMPLATE_INPUT_DIR = REPO_ROOT / "condor" / "output" / "templates" / "merged"
+OUTPUT_PLOTS_DIR = REPO_ROOT / "output" / "plots"
 OUTPUT_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Histogram names to plot and their metadata

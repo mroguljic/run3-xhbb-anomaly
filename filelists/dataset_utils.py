@@ -3,6 +3,10 @@ import subprocess
 import json
 from typing import List, Tuple
 
+# Bare "dasgoclient" is only on PATH in a bare CMSSW/LPC login-node environment;
+# inside our singularity containers it must be reached via its cvmfs path.
+DASGOCLIENT_PATH = "/cvmfs/cms.cern.ch/common/dasgoclient"
+
 def list_files_in_dataset(dataset: str) -> List[Tuple[str, int]]:
     """
     List files in a dataset using dasgoclient.
@@ -14,8 +18,8 @@ def list_files_in_dataset(dataset: str) -> List[Tuple[str, int]]:
         List[Tuple[str, int, int]]: A list of tuples (file_path, file_size, nevents) for files in the dataset.
     """
     try:
-        command = f'dasgoclient -query="file dataset={dataset}" -json'
-        result = subprocess.check_output(command, shell=True, text=True)
+        command = [DASGOCLIENT_PATH, f"-query=file dataset={dataset}", "-json"]
+        result = subprocess.check_output(command, text=True)
 
         files = json.loads(result)
         file_list = []

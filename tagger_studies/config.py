@@ -1,6 +1,10 @@
-MANIFEST_PATH = "condor/template_manifest_2024.json"
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+MANIFEST_PATH = str(REPO_ROOT / "condor" / "template_manifest_2024.json")
 PROCESS_MAPS = {"MX1800_MY100": ["MX1800_MY100"], "QCD": ["QCD-4Jets_HT-600to800","QCD-4Jets_HT-800to1000","QCD-4Jets_HT-1000to1200","QCD-4Jets_HT-1200to1500", "QCD-4Jets_HT-1500to2000", "QCD-4Jets_HT-2000"], "TT": ["TTto4Q", "TTtoLNu2Q"]}
-TEMPLATE_STORE_DIR = "tagger_studies/templates"
+TEMPLATE_STORE_DIR = str(REPO_ROOT / "tagger_studies" / "templates")
 YEAR = "2024"
 SIGNAL = "MX1800_MY100"
 

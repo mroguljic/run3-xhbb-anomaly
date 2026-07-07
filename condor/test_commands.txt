@@ -1,17 +1,22 @@
-cd condor
-python3 generate_batches.py  --datasets QCD-4Jets_HT-800to1000 --year 2024  --output manifest_qcd_test.json
-python3 generate_submission.py --manifest manifest_qcd_test.json --output submission.sub
+# Run all of these from the repo root with anomaly_exec.
+# Manifest/submission files land in condor/ by default; pass an absolute or
+# condor/-prefixed --output path if you want them elsewhere.
 
-python3 generate_batches.py  --year 2024 --all-datasets  --output manifest_2024.json
-python3 generate_submission.py --manifest manifest_2024.json --output submission.sub --test
+# Individual steps
 
-python3 generate_template_manifest.py --skim-manifest manifest_2024.json --output template_manifest_2024.json
-python3 generate_submission.py --manifest template_manifest_2024.json --output template_submission.sub
-python3 merge_templates.py --manifest template_manifest_2024.json --dry-run --merge-groups
-python3 merge_templates.py --manifest template_manifest_2024.json --merge-groups
+anomaly_exec condor/generate_batches.py --datasets QCD-4Jets_HT-800to1000 --year 2024 --output condor/manifest_qcd_test.json
+anomaly_exec condor/generate_submission.py --manifest condor/manifest_qcd_test.json --output condor/submission.sub
 
-# Controller (M1)
-python3 controller.py --year 2024 --all-datasets --dry-run
-python3 controller.py --year 2024 --all-datasets
-python3 controller.py --year 2024 --all-datasets --auto-submit --resubmit-missing
-python3 controller.py --year 2024 --datasets TTto4Q QCD-4Jets_HT-800to1000 --dry-run
+anomaly_exec condor/generate_batches.py --year 2024 --all-datasets --output condor/manifest_2024.json
+anomaly_exec condor/generate_submission.py --manifest condor/manifest_2024.json --output condor/submission.sub --test
+
+anomaly_exec condor/generate_template_manifest.py --skim-manifest condor/manifest_2024.json --output condor/template_manifest_2024.json
+anomaly_exec condor/generate_submission.py --manifest condor/template_manifest_2024.json --output condor/template_submission.sub
+anomaly_exec condor/merge_templates.py --manifest condor/template_manifest_2024.json --dry-run --merge-groups
+anomaly_exec condor/merge_templates.py --manifest condor/template_manifest_2024.json --merge-groups
+
+# Controller
+anomaly_exec condor/controller.py --year 2024 --all-datasets --dry-run
+anomaly_exec condor/controller.py --year 2024 --all-datasets
+anomaly_exec condor/controller.py --year 2024 --all-datasets --auto-submit --resubmit-missing
+anomaly_exec condor/controller.py --year 2024 --datasets TTto4Q QCD-4Jets_HT-800to1000 --dry-run

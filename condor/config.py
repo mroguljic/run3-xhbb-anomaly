@@ -2,6 +2,10 @@
 Condor Submission Framework Configuration
 """
 
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
 CAMPAIGN = "20260703"
@@ -24,7 +28,7 @@ AUTO_SUBMIT = False
 AUTO_RESUBMIT_MISSING = False
 
 MERGED_TEMPLATE_FILENAME = "templates_{process}.root"
-LOCAL_MERGED_TEMPLATES_DIR = "output/templates/merged"
+LOCAL_MERGED_TEMPLATES_DIR = str(REPO_ROOT / "condor" / "output" / "templates" / "merged")
 
 # ============================================================================
 # EOS Filesystem Operations
