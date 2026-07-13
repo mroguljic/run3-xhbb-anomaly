@@ -142,10 +142,12 @@ def event_preselection(options: OptionParser) -> None:
     n_two_valid_fatjets = get_n_events(analyzer)
     n_two_valid_fatjets_weighted = get_n_weighted(analyzer, data_flag)
 
-    # FatJet index of the valid fatjet with higher globalParT Xbb score (H candidate)
+    # FatJet index of the valid fatjet with higher globalParT XbbVsQCD score (H candidate)
+    analyzer.Define("leading_xbb_vs_qcd","FatJet_globalParT3_Xbb[valid_fatjet_indices[0]]/(FatJet_globalParT3_Xbb[valid_fatjet_indices[0]]+FatJet_globalParT3_QCD[valid_fatjet_indices[0]])")
+    analyzer.Define("subleading_xbb_vs_qcd","FatJet_globalParT3_Xbb[valid_fatjet_indices[1]]/(FatJet_globalParT3_Xbb[valid_fatjet_indices[1]]+FatJet_globalParT3_QCD[valid_fatjet_indices[1]])")
     analyzer.Define(
         "h_cand_idx",
-        "FatJet_globalParT3_Xbb[valid_fatjet_indices[0]] > FatJet_globalParT3_Xbb[valid_fatjet_indices[1]] ? valid_fatjet_indices[0] : valid_fatjet_indices[1]",
+        "leading_xbb_vs_qcd > subleading_xbb_vs_qcd ? valid_fatjet_indices[0] : valid_fatjet_indices[1]",
     )
     analyzer.Define(
         "y_cand_idx",

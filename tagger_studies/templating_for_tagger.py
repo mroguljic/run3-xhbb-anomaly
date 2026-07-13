@@ -26,7 +26,7 @@ def define_common_columns(analyzer: Analyzer, data_flag: bool, year: str) -> Non
     else:
         analyzer.Define("event_weight", "genWeight")
 
-    analyzer.Define("h_cand_xbb", "FatJet_globalParT3_Xbb[h_cand_idx]")
+    analyzer.Define("h_cand_xbb", "FatJet_globalParT3_Xbb[h_cand_idx]/(FatJet_globalParT3_Xbb[h_cand_idx]+FatJet_globalParT3_QCD[h_cand_idx])")
     analyzer.Define("y_cand_antiqcd", "1.0 - FatJet_globalParT3_QCD[y_cand_idx]")
     analyzer.Define("trigger_pass", analyzer.GetTriggerString(cuts.triggers[year]))
 
