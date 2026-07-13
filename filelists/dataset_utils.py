@@ -69,8 +69,12 @@ if __name__ == "__main__":
     from Nano_v15 import mc_bkg, mc_sig, jetmet
     example_datasets = {}
     example_datasets["TTTo4Q"] = mc_bkg["2024"]["TTbar"]["TTto4Q"]
+    for HT in [100, 200, 400, 600]:
+        for v in ['W', 'Z']:
+            example_datasets[f"{v}Jets-HT-{HT}"] = mc_bkg["2024"][f"{v}Jets"][f"{v}to2Q-2Jets_HT-{HT}"]
     example_datasets["XToYHto4b_MX1800_MY100"] = mc_sig["2024"]["XtoYHto4b"]["MX1800_MY100"]
-    example_datasets["JetMET_Run2024C"] = jetmet["2024"]["JetMET"]["JetMET0_2024C_v1"] 
+    example_datasets["XtoYHto2W2Bto4Q2B_MX2500_MY1600"] = mc_sig["2024"]["XtoYHto2W2Bto4Q2B"]["MX2500_MY1600"]
+    example_datasets["JetMET_Run2024C"] = jetmet["2024"]["JetMET"]["JetMET0_2024C_v1"]
 
 
     test_dir = "test_files"

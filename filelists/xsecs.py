@@ -22,6 +22,14 @@ xsecs = {
     "QCD-4Jets_HT-1200to1500": 384.8,
     "QCD-4Jets_HT-1500to2000": 127.3,
     "QCD-4Jets_HT-2000": 26.26,
+    "Wto2Q-2Jets_HT-100": 1741.,
+    "Wto2Q-2Jets_HT-200": 165.3,
+    "Wto2Q-2Jets_HT-400": 8.962,
+    "Wto2Q-2Jets_HT-600": 2.252,
+    "Zto2Q-2Jets_HT-100": 706.5,
+    "Zto2Q-2Jets_HT-200": 70.55,
+    "Zto2Q-2Jets_HT-400": 3.792,
+    "Zto2Q-2Jets_HT-600": 0.5073,
 }
 
 int_lumi = {

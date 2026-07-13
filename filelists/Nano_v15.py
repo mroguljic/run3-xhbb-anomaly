@@ -30,16 +30,65 @@ mc_bkg = {
             "QCD-4Jets_HT-1200to1500": "/QCD-4Jets_Bin-HT-1200to1500_TuneCP5_13p6TeV_madgraphMLM-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
             "QCD-4Jets_HT-1500to2000": "/QCD-4Jets_Bin-HT-1500to2000_TuneCP5_13p6TeV_madgraphMLM-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
             "QCD-4Jets_HT-2000": "/QCD-4Jets_Bin-HT-2000_TuneCP5_13p6TeV_madgraphMLM-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM"
+        },
+        "WJets": {
+            "Wto2Q-2Jets_HT-100": "/Wto2Q-2Jets_Bin-PTQQ-100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v3/NANOAODSIM",
+            "Wto2Q-2Jets_HT-200": "/Wto2Q-2Jets_Bin-PTQQ-200_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "Wto2Q-2Jets_HT-400": "/Wto2Q-2Jets_Bin-PTQQ-400_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v3/NANOAODSIM",
+            "Wto2Q-2Jets_HT-600": "/Wto2Q-2Jets_Bin-PTQQ-600_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+        },
+        "ZJets": {
+            "Zto2Q-2Jets_HT-100": "/Zto2Q-2Jets_Bin-PTQQ-100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "Zto2Q-2Jets_HT-200": "/Zto2Q-2Jets_Bin-PTQQ-200_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "Zto2Q-2Jets_HT-400": "/Zto2Q-2Jets_Bin-PTQQ-400_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "Zto2Q-2Jets_HT-600": "/Zto2Q-2Jets_Bin-PTQQ-600_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
         }
     }
 }
 
+# Run get_xhy_sigs.py to create entries automatically for existing signals
 mc_sig = {
     "2022": {},
     "2023": {},
     "2024": {
         "XtoYHto4b" :{
             "MX1800_MY100": "/NMSSM-XtoYHto4B_Par-MX-1800-MY-100_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM"
+        },
+        "XtoYHto2W2Bto4Q2B": {
+            "MX1200_MY500": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1200-MY-500_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1600_MY1000": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1600-MY-1000_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1600_MY1400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1600-MY-1400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1600_MY800": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1600-MY-800_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1800_MY1600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1800-MY-1600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1800_MY300": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1800-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX1800_MY600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-1800-MY-600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2000_MY1600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2000-MY-1600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2000_MY1800": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2000-MY-1800_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2000_MY200": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2000-MY-200_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2000_MY500": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2000-MY-500_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2500_MY1000": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2500-MY-1000_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2500_MY1600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2500-MY-1600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2500_MY400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2500-MY-400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2500_MY500": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2500-MY-500_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX2500_MY600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-2500-MY-600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3000_MY200": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3000-MY-200_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3000_MY300": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3000-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3500_MY2000": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3500-MY-2000_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3500_MY200": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3500-MY-200_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3500_MY300": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3500-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3500_MY400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3500-MY-400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX3500_MY800": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-3500-MY-800_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX4000_MY1800": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-4000-MY-1800_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX4000_MY800": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-4000-MY-800_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX4000_MY1400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-4000-MY-1400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX4000_MY2000": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-4000-MY-2000_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX550_MY300": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-550-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX550_MY400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-550-MY-400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX600_MY400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-600-MY-400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX650_MY500": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-550-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX800_MY400": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-800-MY-400_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX900_MY300": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-900-MY-300_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+            "MX900_MY600": "/NMSSM-XtoYHto2W2Bto4Q2B_Par-MX-900-MY-600_TuneCP5_13p6TeV_madgraph-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
         }
     }
 }
