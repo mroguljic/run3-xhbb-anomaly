@@ -41,6 +41,8 @@ DEFAULT_GROUP_RULES = [
     "JetMET2024=JetMET*_2024*",
     "QCD=QCD*",
     "TT=TT*",
+    "ZJets=Zto*Q*", # wildcard for VJets in case we want to add 3Jets later
+    "WJets=Wto*Q*"
 ]
 
 

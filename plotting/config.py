@@ -142,12 +142,16 @@ HISTOGRAMS_TO_PLOT = {
 
 # https://cms-analysis.docs.cern.ch/guidelines/plotting/colors/#categorical-data-eg-1d-stackplots
 CMS_COLORS = {
+# 6-color scheme
 "blue" : "#5790fc",
 "orange" : "#f89c20",
 "red" : "#e42536",
 "purple" : "#964a8b",
 "gray" : "#9c9ca1",
-"dark_purple" : "#7a21dd"
+"dark_purple" : "#7a21dd",
+# Extras from 10-color scheme
+"olive": "#b9ac70",
+"teal": "#92dadd"
 }
 
 # Process definitions with types and file mappings
@@ -171,10 +175,22 @@ PROCESSES = {
         "label": "ttbar",
         "color": CMS_COLORS["orange"]
     },
-    "MX1800_MY100": {
+    "WJets": {
+        "type": "bkg",
+        "file": "templates_WJets.root",
+        "label": "W+jets",
+        "color": CMS_COLORS["olive"]
+    },
+    "ZJets": {
+        "type": "bkg",
+        "file": "templates_ZJets.root",
+        "label": "Z+jets",
+        "color": CMS_COLORS["teal"]
+    },
+    "MX1800_MY600": {
         "type": "signal",
-        "file": "templates_MX1800_MY100.root",
-        "label": "MX=1800 MY=100",
+        "file": "templates_MX1800_MY600.root",
+        "label": "MX=1800 MY=600",
         "color": CMS_COLORS["red"]
     },
 }
