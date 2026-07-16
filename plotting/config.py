@@ -138,6 +138,24 @@ HISTOGRAMS_TO_PLOT = {
         "y_log_range": None,
         "rebin": 1,
     },
+    "inclusive_h_cand_xbb": {
+        "label": r"H candidate Xbb score",
+        "blind": False,
+        "log_y": True,
+        "x_range": [0,1],
+        "y_range": None,
+        "y_log_range": None,
+        "rebin": 20,
+    },
+    "inclusive_y_cand_antiqcd": {
+        "label": r"Y candidate anti-QCD score",
+        "blind": False,
+        "log_y": True,
+        "x_range": [0,1],
+        "y_range": None,
+        "y_log_range": None,
+        "rebin": 20,
+    },
 }
 
 # https://cms-analysis.docs.cern.ch/guidelines/plotting/colors/#categorical-data-eg-1d-stackplots
