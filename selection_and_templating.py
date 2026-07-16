@@ -25,6 +25,33 @@ JET_PHI_BINS = (32, -3.2, 3.2)
 JET_MASS_BINS = (80, 0, 300)
 SCORE_BINS = (1000, 0, 1)
 WEIGHT_BINS = (50, 0, 2)
+
+
+def _segmented_bin_edges(segments: list, ndigits: int = 6) -> list:
+    """Build variable bin edges from (start, stop, step) segments.
+
+    Each segment covers [start, stop] at its own step; segments must chain
+    (each start equal to the previous stop). Edges are rounded to collapse
+    floating-point drift from repeated addition (e.g. 19*0.05 ==
+    0.9500000000000001, not 0.95) which would otherwise land TAxis::FindBin
+    queries for a round number like 0.95 one bin off from the intended edge.
+    """
+    edges = [round(segments[0][0], ndigits)]
+    for start, stop, step in segments:
+        n_steps = round((stop - start) / step)
+        edges.extend(round(start + (i + 1) * step, ndigits) for i in range(n_steps))
+    return edges
+
+
+# Joint (m_jj, m_jY, Xbb, anti-QCD) histogram booked in book_inclusive_diagnostics,
+# used by tagger_studies/ to scan WP + mass-window choices from a single
+# already-produced histogram instead of re-running the analyzer per point.
+# Variable bin edges: coarse where we don't expect optimal value to live
+# (Xbb ~0.99) -- keeps the dense THnD small while still resolving real cuts.
+TAGGER_SCAN_M_JJ_EDGES = _segmented_bin_edges([(700, 1400, 100), (1400, 2000, 200), (2000, 4000, 500)])
+TAGGER_SCAN_M_JY_EDGES = _segmented_bin_edges([(40, 200, 20), (200, 400, 50), (400, 600, 100)])
+TAGGER_SCAN_XBB_EDGES = _segmented_bin_edges([(0.0, 0.95, 0.05), (0.95, 1.0, 0.01)])
+TAGGER_SCAN_ANTIQCD_EDGES = _segmented_bin_edges([(0.0, 1.0, 0.05)])
 TEMPLATE_VARIATIONS = ("nom", "JES__up", "JES__down", "JER__up", "JER__down")
 
 
@@ -170,6 +197,35 @@ def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
         analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_msd_nom", "event_weight"),
     ]
 
+def book_tagger_scan_histogram(analyzer: Analyzer):
+    """Book the joint (m_jj, m_jY, Xbb, anti-QCD) histogram for WP/mass-window studies.
+
+    See tagger_studies/analyze_yield.py: any WP cut combined with any mass
+    window can be read off this single histogram by integrating bin ranges
+    offline, so WP scans don't need to re-run the analyzer per point.
+    """
+    edge_lists = [
+        TAGGER_SCAN_M_JJ_EDGES,
+        TAGGER_SCAN_M_JY_EDGES,
+        TAGGER_SCAN_XBB_EDGES,
+        TAGGER_SCAN_ANTIQCD_EDGES,
+    ]
+    nbins = ROOT.std.vector("int")([len(edges) - 1 for edges in edge_lists])
+    xbins = ROOT.std.vector("vector<double>")(
+        [ROOT.std.vector("double")(edges) for edges in edge_lists]
+    )
+
+    model = ROOT.RDF.THnDModel(
+        "inclusive_h_xbb_vs_y_antiqcd",
+        ";m_{jj} [GeV];m_{jY} [GeV];H candidate Xbb;Y candidate anti-QCD",
+        4, nbins, xbins,
+    )
+    columns = ROOT.std.vector("string")(
+        ["m_jj_nom", "y_cand_msd_nom", "h_cand_xbb", "y_cand_antiqcd", "event_weight"]
+    )
+    return analyzer.DataFrame.HistoND(model, columns)
+
+
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
     """Book nominal diagnostics after the common selection and before region splits."""
     histograms = book_diagnostics(analyzer, "inclusive_")
@@ -177,6 +233,7 @@ def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
         [
             analyzer.DataFrame.Histo1D(("inclusive_h_cand_xbb", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight"),
             analyzer.DataFrame.Histo1D(("inclusive_y_cand_antiqcd", ";y candidate anti-QCD;Events", *SCORE_BINS), "y_cand_antiqcd", "event_weight"),
+            book_tagger_scan_histogram(analyzer),
         ]
     )
     return histograms
