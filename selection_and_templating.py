@@ -200,7 +200,7 @@ def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
 def book_tagger_scan_histogram(analyzer: Analyzer):
     """Book the joint (m_jj, m_jY, Xbb, anti-QCD) histogram for WP/mass-window studies.
 
-    See tagger_studies/analyze_yield.py: any WP cut combined with any mass
+    See tagger_studies/thn_utils.py: any WP cut combined with any mass
     window can be read off this single histogram by integrating bin ranges
     offline, so WP scans don't need to re-run the analyzer per point.
     """

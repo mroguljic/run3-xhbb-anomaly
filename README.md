@@ -62,6 +62,19 @@ Individual pipeline stages (`generate_batches.py`, `generate_submission.py`,
 `check_template_outputs.py`, `merge_templates.py`) can also be run standalone
 — see `condor/test_commands.txt` for the full sequence.
 
+`generate_submission.py` and `condor_submit` must be run from inside `condor/`
+— `controller.py` always does this itself, but if you're running these steps
+by hand, note the generated `.sub` file's `executable = template_wrapper.sh`
+line is a bare filename, resolved relative to wherever `condor_submit` is
+invoked from, not to where the `.sub` file lives. Running it from the repo
+root fails with `ERROR: Executable file template_wrapper.sh does not exist`:
+
+```bash
+cd condor
+anomaly_exec generate_submission.py --manifest template_manifest_2024.json --output template_submission_2024.sub
+condor_submit template_submission_2024.sub
+```
+
 Merged, cross-section-scaled templates land in
 `condor/output/templates/merged/templates_<process>.root`.
 
@@ -89,17 +102,41 @@ anomaly_exec plotting/cli.py --year 2024 --input-dir condor/output/templates/mer
 ## 5. Tagger studies (`tagger_studies/`)
 
 A standalone workflow for scanning Xbb/anti-QCD working points and computing
-significance/yield tradeoffs directly from already-produced template ROOT
-files. Config (process-to-dataset mapping, scan grid, signal-region
-integration bins) lives in `tagger_studies/config.py`.
+significance directly from the joint (m_jj, m_jY, Xbb, anti-QCD) THnD
+(`inclusive_h_xbb_vs_y_antiqcd`) that `selection_and_templating.py` books per
+process, read straight out of the already-merged template ROOT files -- no
+per-WP re-templating needed. Config (background processes, the list of
+signals to scan, window-finding target fraction) lives in
+`tagger_studies/config.py`; edit its `SIGNALS` list to control which signal
+points get scanned.
+
+For each signal, the scan derives that signal's own (m_jj, m_jY) integration
+window from its kinematic peak (fixed-fraction contour around the peak bin),
+skips signals whose window doesn't contain their own (MX, MY) -- a sign the Y
+candidate isn't merging into a single AK8 jet at that mass ratio -- then
+computes the Asimov significance Z = sqrt(2*((S+B)*ln(1+S/B) - S)) over every
+(Xbb, anti-QCD) bin-boundary combination the THnD resolves (B summed over
+`config.BACKGROUND_PROCESSES`).
 
 ```bash
-# First edit settings in tagger_studies/config.py
-# Run the working-point scan (produces per-process templates in
-# tagger_studies/templates/ if they don't already exist, then optimizes
-# the Xbb and anti-QCD working points)
-anomaly_exec tagger_studies/optimize_taggers.py
+# First edit tagger_studies/config.py's SIGNALS list to pick which signals to scan
+anomaly_exec tagger_studies/significance_scan.py
+
+# Or restrict to specific signals ad hoc, without touching config.py
+anomaly_exec tagger_studies/significance_scan.py --signals MX1800_MY100 MX3000_MY300
 
 # ROC curves for both taggers from the merged templates
 anomaly_exec tagger_studies/roc.py --input-dir condor/output/templates/merged --output-dir tagger_studies/roc
 ```
+
+Output per signal, under `tagger_studies/scans/<signal>/`:
+- `significance.png`/`.pdf` -- Asimov significance heatmap over the full
+  (Xbb WP, anti-QCD WP) grid, with the best point marked
+- `mjj_dist.png`/`.pdf`, `mjy_dist.png`/`.pdf` -- stacked background + signal
+  mass distributions at the best WP, restricted to the *other* axis' window
+  (i.e. exactly the selection that fed the significance calculation)
+- `mjj_dist_full.png`/`.pdf`, `mjy_dist_full.png`/`.pdf` -- the same
+  projections with no cut on the other axis (WP cut only)
+
+`tagger_studies/scans/summary.csv` collects the best WP/window/significance
+across all scanned signals.
