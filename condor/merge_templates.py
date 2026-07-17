@@ -164,11 +164,13 @@ def scale_histograms_in_file(input_root_file: str, output_root_file: str, scale_
         if h.InheritsFrom("TH1"):
             h.Scale(scale_factor)
             h.SetDirectory(0)
-            histos.append(h)
             scaled_histograms += 1
-        else:
-            # As it stands, we should only have histograms in the file, but this allows copying other objects
-            histos.append(h)
+        elif h.InheritsFrom("THnBase"):
+            # THnD (e.g. the tagger-scan histogram) doesn't inherit from TH1 and has no
+            # SetDirectory, but still needs the same xsec*lumi/genWeightSum scaling.
+            h.Scale(scale_factor)
+            scaled_histograms += 1
+        histos.append(h)
     input_tfile.Close()
 
     output_tfile = ROOT.TFile.Open(output_root_file, "RECREATE")
