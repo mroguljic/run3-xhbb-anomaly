@@ -54,6 +54,17 @@ TAGGER_SCAN_XBB_EDGES = _segmented_bin_edges([(0.0, 0.95, 0.05), (0.95, 1.0, 0.0
 TAGGER_SCAN_ANTIQCD_EDGES = _segmented_bin_edges([(0.0, 1.0, 0.05)])
 TEMPLATE_VARIATIONS = ("nom", "JES__up", "JES__down", "JER__up", "JER__down")
 
+# Weight-based systematics: (Correction name registered via AddCorrection, template syst name).
+# These reweight the nominal-JEC (m_jj, m_jY) selection rather than re-deriving kinematics,
+# since they only affect the event weight, not jet momenta.
+WEIGHT_SYSTEMATICS = (
+    ("PileUp_Corr", "PileUp"),
+    ("Pdfweight", "PDF"),
+    ("ISRunc", "ISR"),
+    ("FSRunc", "FSR"),
+    ("QCDscale_uncert", "QCDscale"),
+)
+
 
 def define_common_columns(analyzer: Analyzer, data_flag: bool, year: str) -> None:
     """Define columns used by templates, diagnostics, and region selections."""
@@ -182,19 +193,19 @@ def book_systematic_weights(analyzer: Analyzer) -> list:
 def book_diagnostics(analyzer: Analyzer, prefix: str) -> list:
     """Book shared diagnostic histograms with a configurable name prefix."""
     return [
-        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_pt", ";leading jet p_{T} [GeV];Events", *JET_PT_BINS), "lead_jet_pt", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_pt", ";subleading jet p_{T} [GeV];Events", *JET_PT_BINS), "sublead_jet_pt", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_eta", ";leading jet #eta;Events", *JET_ETA_BINS), "lead_jet_eta", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_eta", ";subleading jet #eta;Events", *JET_ETA_BINS), "sublead_jet_eta", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_phi", ";leading jet #phi;Events", *JET_PHI_BINS), "lead_jet_phi", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_phi", ";subleading jet #phi;Events", *JET_PHI_BINS), "sublead_jet_phi", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_mreg", ";leading jet m_{reg} [GeV];Events", *JET_MASS_BINS), "lead_jet_mreg", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_mreg", ";subleading jet m_{reg} [GeV];Events", *JET_MASS_BINS), "sublead_jet_mreg", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_mass", ";leading jet mass [GeV];Events", *JET_MASS_BINS), "lead_jet_mass", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_mass", ";subleading jet mass [GeV];Events", *JET_MASS_BINS), "sublead_jet_mass", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}m_jj", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}m_jy", ";m_{jy} [GeV];Events", *M_JY_BINS), "y_cand_msd_nom", "event_weight"),
-        analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_msd_nom", "event_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_pt", ";leading jet p_{T} [GeV];Events", *JET_PT_BINS), "lead_jet_pt", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_pt", ";subleading jet p_{T} [GeV];Events", *JET_PT_BINS), "sublead_jet_pt", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_eta", ";leading jet #eta;Events", *JET_ETA_BINS), "lead_jet_eta", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_eta", ";subleading jet #eta;Events", *JET_ETA_BINS), "sublead_jet_eta", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_phi", ";leading jet #phi;Events", *JET_PHI_BINS), "lead_jet_phi", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_phi", ";subleading jet #phi;Events", *JET_PHI_BINS), "sublead_jet_phi", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_mreg", ";leading jet m_{reg} [GeV];Events", *JET_MASS_BINS), "lead_jet_mreg", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_mreg", ";subleading jet m_{reg} [GeV];Events", *JET_MASS_BINS), "sublead_jet_mreg", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}lead_jet_mass", ";leading jet mass [GeV];Events", *JET_MASS_BINS), "lead_jet_mass", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}sublead_jet_mass", ";subleading jet mass [GeV];Events", *JET_MASS_BINS), "sublead_jet_mass", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}m_jj", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}m_jy", ";m_{jy} [GeV];Events", *M_JY_BINS), "y_cand_msd_nom", "nominal_weight"),
+        analyzer.DataFrame.Histo1D((f"{prefix}m_jh", ";m_{jh} [GeV];Events", *JET_MASS_BINS), "h_cand_msd_nom", "nominal_weight"),
     ]
 
 def book_tagger_scan_histogram(analyzer: Analyzer):
@@ -221,7 +232,7 @@ def book_tagger_scan_histogram(analyzer: Analyzer):
         4, nbins, xbins,
     )
     columns = ROOT.std.vector("string")(
-        ["m_jj_nom", "y_cand_msd_nom", "h_cand_xbb", "y_cand_antiqcd", "event_weight"]
+        ["m_jj_nom", "y_cand_msd_nom", "h_cand_xbb", "y_cand_antiqcd", "nominal_weight"]
     )
     return analyzer.DataFrame.HistoND(model, columns)
 
@@ -231,8 +242,8 @@ def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
     histograms = book_diagnostics(analyzer, "inclusive_")
     histograms.extend(
         [
-            analyzer.DataFrame.Histo1D(("inclusive_h_cand_xbb", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight"),
-            analyzer.DataFrame.Histo1D(("inclusive_y_cand_antiqcd", ";y candidate anti-QCD;Events", *SCORE_BINS), "y_cand_antiqcd", "event_weight"),
+            analyzer.DataFrame.Histo1D(("inclusive_h_cand_xbb", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "nominal_weight"),
+            analyzer.DataFrame.Histo1D(("inclusive_y_cand_antiqcd", ";y candidate anti-QCD;Events", *SCORE_BINS), "y_cand_antiqcd", "nominal_weight"),
             book_tagger_scan_histogram(analyzer),
         ]
     )
@@ -250,7 +261,18 @@ def book_template(analyzer: Analyzer, region_name: str, variation: str) -> objec
         (f"template_{region_name}_{variation}", ";m_{jj} [GeV];m_{jy} [GeV]", *M_JJ_BINS, *M_JY_BINS),
         f"m_jj_{variation}",
         f"y_cand_msd_{variation}",
-        "event_weight",
+        "nominal_weight",
+    )
+
+
+def book_weight_template(analyzer: Analyzer, region_name: str, syst_name: str, direction: str, weight_column: str) -> object:
+    """Book a single 2D template histogram for a region and weight-based systematic variation."""
+    variation = f"{syst_name}__{direction}"
+    return analyzer.DataFrame.Histo2D(
+        (f"template_{region_name}_{variation}", ";m_{jj} [GeV];m_{jy} [GeV]", *M_JJ_BINS, *M_JY_BINS),
+        "m_jj_nom",
+        "y_cand_msd_nom",
+        weight_column,
     )
 
 
@@ -301,35 +323,41 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     analyzer.Cut("template_cutflow_trigger", "trigger_pass")
     post_trigger = get_n_weighted(analyzer, data_flag, "event_weight")
 
-    common_no_pt_node = analyzer.GetActiveNode() # Node without pT/mass cuts that are JEC-variation dependent
-
-    #Cuts for diagnostics histograms that are calculated only for nominal JEC variation
-    #pT
-    apply_h_pt_cut(analyzer, year, "nom", "template_nom")
-    post_h_pt = get_n_weighted(analyzer, data_flag, "event_weight")
-    apply_y_pt_cut(analyzer, year, "nom", "template_nom")
-    post_y_pt = get_n_weighted(analyzer, data_flag, "event_weight")
-
-    #mass
-    apply_h_mass_cut(analyzer, year, "nom", "template_nom")
-    post_h_mass = get_n_weighted(analyzer, data_flag, "event_weight")
-    apply_y_mass_cut(analyzer, year, "nom", "template_nom")
-    post_y_mass = get_n_weighted(analyzer, data_flag, "event_weight")
-
-    nominal_common_node = analyzer.GetActiveNode()
-
+    ###############################################################################################################
+    #                                                   Corrections                                               #
+    ###############################################################################################################
+    # Pileup (MC only). Applied here, upstream of the JEC-variation branch point, so the resulting
+    # "nominal_weight" (event_weight * PileUp_Corr__nom) is available to the nom, JES, and JER
+    # templates alike, as well as to the yield/diagnostic histograms below.
     if not data_flag:
-        ###############################################################################################################
-        #                                                   Corrections                                               #
-        ###############################################################################################################
-        # Pileup
         pileup_file = corrections_paths.corrections[year]["Pileup"]
         cset_pileup = core.CorrectionSet.from_file(pileup_file)
         collisions  = list(cset_pileup); assert(len(collisions) == 1); collisions = collisions[0] # Should only ever be one key (collision goldenJSON)
         pu = Correction("PileUp_Corr", "TIMBER/Framework/src/PileUp_correctionlib_weight.cc", [pileup_file, collisions, analyzer.isData], corrtype="weight")
         evalargs = {"Pileup_nTrueInt": "Pileup_nTrueInt"}
         analyzer.AddCorrection(pu, evalargs)
+        analyzer.Define("nominal_weight", "event_weight * PileUp_Corr__nom")
+    else:
+        analyzer.Define("nominal_weight", "event_weight")
 
+    common_no_pt_node = analyzer.GetActiveNode() # Node without pT/mass cuts that are JEC-variation dependent
+
+    #Cuts for diagnostics histograms that are calculated only for nominal JEC variation
+    #pT
+    apply_h_pt_cut(analyzer, year, "nom", "template_nom")
+    post_h_pt = get_n_weighted(analyzer, data_flag, "nominal_weight")
+    apply_y_pt_cut(analyzer, year, "nom", "template_nom")
+    post_y_pt = get_n_weighted(analyzer, data_flag, "nominal_weight")
+
+    #mass
+    apply_h_mass_cut(analyzer, year, "nom", "template_nom")
+    post_h_mass = get_n_weighted(analyzer, data_flag, "nominal_weight")
+    apply_y_mass_cut(analyzer, year, "nom", "template_nom")
+    post_y_mass = get_n_weighted(analyzer, data_flag, "nominal_weight")
+
+    nominal_common_node = analyzer.GetActiveNode()
+
+    if not data_flag:
         # PDF
         errtype = get_pdf_errtype(analyzer.lhaid)
         analyzer.AddCorrection(
@@ -354,9 +382,10 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
         QCDScaleUncert = Correction('QCDscale_uncert', './TIMBER_modules/LHEScaleWeights.cc', corrtype='uncert', mainFunc='evalUncert')
         analyzer.AddCorrection(QCDScaleUncert, evalArgs={'LHEScaleWeights':'LHEScaleWeight'})
 
-        # Have TIMBER automatically create the weight columns based on the registered Corrections. 
-        # Pass in column "event_weight" == genWeight (if MC, else 1.0) as an extra multiplicative factor to the corrections. 
-        analyzer.MakeWeightCols(extraNominal='event_weight') 
+        # Have TIMBER automatically create the weight columns based on the registered Corrections.
+        # Pass in column "event_weight" == genWeight (if MC, else 1.0) as an extra multiplicative factor to the corrections.
+        analyzer.MakeWeightCols(extraNominal='event_weight')
+        weighted_nominal_node = analyzer.GetActiveNode()  # nominal_common_node (pT/mass cuts) + weight__* columns
 
         # Book histograms of the weights
         systematic_weight_histograms = book_systematic_weights(analyzer)
@@ -371,7 +400,7 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
         region_name = f"{h_region[0]}{y_region[0]}"
         analyzer.SetActiveNode(nominal_region_root)
         analyzer.Cut(f"region_{region_name}_nom", region_expression(h_region, y_region, year))
-        region_yields[region_name] = get_n_weighted(analyzer, data_flag, "event_weight")
+        region_yields[region_name] = get_n_weighted(analyzer, data_flag, "nominal_weight")
         region_histograms.append(book_template(analyzer, region_name, "nom"))
         region_histograms.extend(book_region_diagnostics(analyzer, region_name))
 
@@ -385,6 +414,16 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
                 analyzer.SetActiveNode(varied_region_root)
                 analyzer.Cut(f"region_{region_name}_{variation}", region_expression(h_region, y_region, year))
                 region_histograms.append(book_template(analyzer, region_name, variation))
+
+        for corr_name, syst_name in WEIGHT_SYSTEMATICS:
+            for direction in ("up", "down"):
+                analyzer.SetActiveNode(weighted_nominal_node)
+                weight_column = analyzer.GetWeightName(corr_name, direction)
+                for h_region, y_region in cuts.TEMPLATE_REGIONS[year]:
+                    region_name = f"{h_region[0]}{y_region[0]}"
+                    analyzer.SetActiveNode(weighted_nominal_node)
+                    analyzer.Cut(f"region_{region_name}_{syst_name}_{direction}", region_expression(h_region, y_region, year))
+                    region_histograms.append(book_weight_template(analyzer, region_name, syst_name, direction, weight_column))
 
     extra_cutflow_bins = [
         ("Post trigger", post_trigger),
