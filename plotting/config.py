@@ -205,10 +205,10 @@ PROCESSES = {
         "label": "Z+jets",
         "color": CMS_COLORS["teal"]
     },
-    "MX1800_MY600": {
+    "MX2000_MY200": {
         "type": "signal",
-        "file": "templates_MX1800_MY600.root",
-        "label": "MX=1800 MY=600",
+        "file": "templates_MX2000_MY200.root",
+        "label": "MX=2000 MY=200",
         "color": CMS_COLORS["red"]
     },
 }
