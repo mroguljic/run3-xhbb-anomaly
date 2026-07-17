@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Caveman scan for the Fail/Control lower WP bounds in
+"""Scan for the Fail/Control lower WP bounds in
 cuts.TEMPLATE_REGION_BOUNDARIES.
 
 Reports yields in 
