@@ -4,7 +4,7 @@ Condor Submission Framework Configuration
 
 from pathlib import Path
 import os
-j
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
