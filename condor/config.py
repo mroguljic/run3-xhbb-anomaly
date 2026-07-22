@@ -4,13 +4,13 @@ Condor Submission Framework Configuration
 
 from pathlib import Path
 import os
-
+j
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
-CAMPAIGN = "20260703"
-BASE_STORE_PATH = f"/store/user/{os.environ.get('USER')}/run3-xhbb-anomaly"
+CAMPAIGN = "20260722"
+BASE_STORE_PATH = f"/store/group/lpchbbrun3/{os.environ.get('USER')}/run3-xhbb-anomaly"
 
 OUTPUT = {
     "skims_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/skims",
