@@ -24,10 +24,11 @@ TEMPLATE_SELECTION = {
 }
 
 TEMPLATE_TAGGING_WPS = {
+ #Lower boundaries set so kinematics are more similar to pass / signal regions
     "2024": {
         "h_xbb_wp": 0.99,
         "y_antiqcd_wp": 0.90, 
-        "h_xbb_wp_lo": 0.50, #Lower boundaries set so kinematics are more similar to pass / signal regions
+        "h_xbb_wp_lo": 0.50,
         "y_antiqcd_wp_lo": 0.60, 
     }
 }
@@ -56,4 +57,8 @@ triggers = {
         "HLT_AK8DiPFJet250_250_SoftDropMass40",
         "HLT_AK8PFJet250_SoftDropMass40_PNetBB0p06",
     ]
+}
+
+REFERENCE_TRIGGER = {
+    "2024": "HLT_Mu50",
 }
