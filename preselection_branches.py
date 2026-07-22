@@ -26,6 +26,7 @@ COMMON_SNAPSHOT_COLUMNS: list[str] = [
     "HLT_AK8DiPFJet250_250_SoftDropMass40",
     "HLT_AK8PFJet250_SoftDropMass40_PNetBB0p06",
     "HLT_AK8DiPFJet250_250_MassSD30",
+    "HLT_Mu50",
     "Pileup_nTrueInt", # Pileup reweighting
     "LHEPdfWeight",    # PDF reweighting
     "PSWeight",        # ISR/FSR correction
