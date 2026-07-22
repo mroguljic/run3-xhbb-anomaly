@@ -103,12 +103,19 @@ def apply_h_mass_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name
         f"h_cand_msd_{jec_variation} >= {selection['h_cand_mass_min']} && h_cand_msd_{jec_variation} <= {selection['h_cand_mass_max']}",
     )
 
+def apply_mjj_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
+    """Apply the m_jj search-region floor."""
+    region = cuts.REGION_CUTS[year]
+    analyzer.Cut(f"{cut_name_prefix}_mjj_cut_{jec_variation}", f"m_jj_{jec_variation} >= {region['m_jj_min']}")
+
+
 def apply_selection_for_variation(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
-    """Apply pT cuts for a specific JEC variation."""
+    """Apply pT, mass, and m_jj cuts for a specific JEC variation."""
     apply_h_pt_cut(analyzer, year, jec_variation, cut_name_prefix)
     apply_y_pt_cut(analyzer, year, jec_variation, cut_name_prefix)
     apply_h_mass_cut(analyzer, year, jec_variation, cut_name_prefix)
     apply_y_mass_cut(analyzer, year, jec_variation, cut_name_prefix)
+    apply_mjj_cut(analyzer, year, jec_variation, cut_name_prefix)
 
 
 def apply_h_pt_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
@@ -301,6 +308,66 @@ def region_expression(h_region: str, y_region: str, year: str) -> str:
     return f"({h_cut}) && ({y_cut})"
 
 
+def book_trigger_efficiency_histograms(analyzer: Analyzer, data_flag: bool, year: str) -> list:
+    """Book Total/Pass histogram pairs to measure the analysis trigger's efficiency.
+
+    Booked at the kinematic (mass + m_jj + pT) selection node, before the analysis's own hard
+    trigger cut. For data this additionally requires a reference/tag trigger
+    (cuts.REFERENCE_TRIGGER, recorded on a Muon PD) to get an unbiased-in-data denominator;
+    """
+
+    leg_a_name, leg_b_name = cuts.triggers[year] # Assumes two triggers
+    if len(cuts.triggers[year]) != 2:
+        print(f"[WARNING]: Trigger efficiency histograms assume two trigger paths. Got {cuts.triggers[year]}")
+    analyzer.Define("trig_leg_a_pass", analyzer.GetTriggerString([leg_a_name]))
+    analyzer.Define("trig_leg_b_pass", analyzer.GetTriggerString([leg_b_name]))
+
+    start_node = analyzer.GetActiveNode()
+
+    if data_flag:
+        analyzer.Define("trig_reference_pass", analyzer.GetTriggerString([cuts.REFERENCE_TRIGGER[year]]))
+        analyzer.Cut("trigeff_reference_cut", "trig_reference_pass")
+    denominator_node = analyzer.GetActiveNode()
+
+    histograms = []
+
+    # Direct OR (ground truth / cross-check)
+    analyzer.SetActiveNode(denominator_node)
+    histograms.append(analyzer.DataFrame.Histo2D(
+        ("trigeff_or_total", ";m_{jj} [GeV];h candidate Xbb", *M_JJ_BINS, *SCORE_BINS),
+        "m_jj_nom", "h_cand_xbb", "event_weight",
+    ))
+    analyzer.Cut("trigeff_or_pass_cut", "trigger_pass")
+    histograms.append(analyzer.DataFrame.Histo2D(
+        ("trigeff_or_pass", ";m_{jj} [GeV];h candidate Xbb", *M_JJ_BINS, *SCORE_BINS),
+        "m_jj_nom", "h_cand_xbb", "event_weight",
+    ))
+
+    # Leg A (untagged dijet, kinematic)
+    analyzer.SetActiveNode(denominator_node)
+    histograms.append(analyzer.DataFrame.Histo1D(
+        ("trigeff_legA_total", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
+    ))
+    analyzer.Cut("trigeff_legA_pass_cut", "trig_leg_a_pass")
+    histograms.append(analyzer.DataFrame.Histo1D(
+        ("trigeff_legA_pass", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
+    ))
+
+    # Leg B given leg A failed (PNet-tagged leg, conditional)
+    analyzer.SetActiveNode(denominator_node)
+    analyzer.Cut("trigeff_legB_denom_cut", "!trig_leg_a_pass")
+    histograms.append(analyzer.DataFrame.Histo1D(
+        ("trigeff_legB_given_notA_total", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
+    ))
+    analyzer.Cut("trigeff_legB_pass_cut", "trig_leg_b_pass")
+    histograms.append(analyzer.DataFrame.Histo1D(
+        ("trigeff_legB_given_notA_pass", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
+    ))
+
+    analyzer.SetActiveNode(start_node)
+    return histograms
+
+
 def write_histograms(output_file: ROOT.TFile, histograms: list) -> None:
     """Write booked ROOT RDataFrame histograms to the output file."""
     output_file.cd()
@@ -319,16 +386,13 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     define_common_columns(analyzer, data_flag, year)
     selection_root = analyzer.GetActiveNode()
 
-    analyzer.SetActiveNode(selection_root)
-    analyzer.Cut("template_cutflow_trigger", "trigger_pass")
-    post_trigger = get_n_weighted(analyzer, data_flag, "event_weight")
-
     ###############################################################################################################
     #                                                   Corrections                                               #
     ###############################################################################################################
-    # Pileup (MC only). Applied here, upstream of the JEC-variation branch point, so the resulting
-    # "nominal_weight" (event_weight * PileUp_Corr__nom) is available to the nom, JES, and JER
-    # templates alike, as well as to the yield/diagnostic histograms below.
+    # Pileup (MC only). Applied here, before any selection cuts, so "nominal_weight" is available
+    # to every downstream branch -- the nominal kinematic/trigger path, the trigger-efficiency
+    # measurement, and the JES/JER-variation branch -- without re-registering the correction
+    # separately on each one.
     if not data_flag:
         pileup_file = corrections_paths.corrections[year]["Pileup"]
         cset_pileup = core.CorrectionSet.from_file(pileup_file)
@@ -340,22 +404,47 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     else:
         analyzer.Define("nominal_weight", "event_weight")
 
-    common_no_pt_node = analyzer.GetActiveNode() # Node without pT/mass cuts that are JEC-variation dependent
+    pre_selection_node = analyzer.GetActiveNode() # Common columns + nominal_weight, no selection cuts yet
 
-    #Cuts for diagnostics histograms that are calculated only for nominal JEC variation
-    #pT
-    apply_h_pt_cut(analyzer, year, "nom", "template_nom")
-    post_h_pt = get_n_weighted(analyzer, data_flag, "nominal_weight")
-    apply_y_pt_cut(analyzer, year, "nom", "template_nom")
-    post_y_pt = get_n_weighted(analyzer, data_flag, "nominal_weight")
-
-    #mass
+    # Nominal kinematic selection (mass, m_jj, pT), applied before the trigger cut and the
+    # trigger-efficiency measurement below, so both share the same selected population as the
+    # eventual nominal templates.
+    analyzer.SetActiveNode(pre_selection_node)
     apply_h_mass_cut(analyzer, year, "nom", "template_nom")
-    post_h_mass = get_n_weighted(analyzer, data_flag, "nominal_weight")
+    post_h_mass = get_n_weighted(analyzer, data_flag, "event_weight")
     apply_y_mass_cut(analyzer, year, "nom", "template_nom")
-    post_y_mass = get_n_weighted(analyzer, data_flag, "nominal_weight")
+    post_y_mass = get_n_weighted(analyzer, data_flag, "event_weight")
+    apply_mjj_cut(analyzer, year, "nom", "template_nom")
+    post_mjj = get_n_weighted(analyzer, data_flag, "event_weight")
+    apply_h_pt_cut(analyzer, year, "nom", "template_nom")
+    post_h_pt = get_n_weighted(analyzer, data_flag, "event_weight")
+    apply_y_pt_cut(analyzer, year, "nom", "template_nom")
+    post_y_pt = get_n_weighted(analyzer, data_flag, "event_weight")
 
-    nominal_common_node = analyzer.GetActiveNode()
+    kinematic_node = analyzer.GetActiveNode()
+
+    # Trigger-efficiency measurement: booked before the hard trigger cut below, at the same
+    # kinematic node the nominal templates ultimately use. See book_trigger_efficiency_histograms
+    # for why no JetMET-vs-Muon-PD dataset flag is needed.
+    trigger_efficiency_histograms = book_trigger_efficiency_histograms(analyzer, data_flag, year)
+
+    analyzer.SetActiveNode(kinematic_node)
+    analyzer.Cut("template_cutflow_trigger", "trigger_pass")
+    post_trigger = get_n_weighted(analyzer, data_flag, "event_weight")
+
+    nominal_common_node = analyzer.GetActiveNode() # Nominal mass/m_jj/pT + trigger cuts; root for the nominal region split
+
+    # Separate branch for JES/JER-varied templates: only the (variation-independent) trigger cut
+    # is baked in here. Mass/m_jj/pT are re-derived per variation from that variation's own JEC
+    # columns in apply_selection_for_variation below, so they are deliberately NOT inherited from
+    # the nominal cuts above -- otherwise varied templates would incorrectly be restricted to the
+    # intersection with the nominal selection instead of their own independently-derived one.
+    analyzer.SetActiveNode(pre_selection_node)
+    analyzer.Cut("variation_cutflow_trigger", "trigger_pass")
+    common_no_pt_node = analyzer.GetActiveNode()
+
+    # Restore the active node to the nominal line for the corrections/diagnostics/region-booking below.
+    analyzer.SetActiveNode(nominal_common_node)
 
     if not data_flag:
         # PDF
@@ -426,11 +515,12 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
                     region_histograms.append(book_weight_template(analyzer, region_name, syst_name, direction, weight_column))
 
     extra_cutflow_bins = [
+        ("Post H mass", post_h_mass),
+        ("Post Y mass", post_y_mass),
+        ("Post mjj", post_mjj),
         ("Post trigger", post_trigger),
         ("Post H pT", post_h_pt),
         ("Post Y pT", post_y_pt),
-        ("Post H mass", post_h_mass),
-        ("Post Y mass", post_y_mass),
     ]
     extra_cutflow_bins.extend((f"Region {region_name}", region_yields[region_name]) for region_name in region_yields)
     template_cutflow = make_extended_cutflow_histogram(selection_cutflow, extra_cutflow_bins)
@@ -438,6 +528,7 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     output_file = ROOT.TFile(output_file_path, "RECREATE")
     write_histograms(output_file, inclusive_histograms)
     write_histograms(output_file, region_histograms)
+    write_histograms(output_file, trigger_efficiency_histograms)
     if not data_flag:
         write_histograms(output_file, systematic_weight_histograms)
     template_cutflow.Write()
