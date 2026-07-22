@@ -93,6 +93,29 @@ mc_sig = {
     }
 }
 
+muon = {
+    "2024": {
+        "Muon": {
+            "Muon0_2024C_v1": "/Muon0/Run2024C-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024C_v1": "/Muon1/Run2024C-MINIv6NANOv15-v1/NANOAOD",
+            "Muon0_2024D_v1": "/Muon0/Run2024D-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024D_v1": "/Muon1/Run2024D-MINIv6NANOv15-v1/NANOAOD",
+            "Muon0_2024E_v1": "/Muon0/Run2024E-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024E_v1": "/Muon1/Run2024E-MINIv6NANOv15-v1/NANOAOD",
+            "Muon0_2024F_v1": "/Muon0/Run2024F-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024F_v1": "/Muon1/Run2024F-MINIv6NANOv15-v1/NANOAOD",
+            "Muon0_2024G_v1": "/Muon0/Run2024G-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024G_v2": "/Muon1/Run2024G-MINIv6NANOv15-v2/NANOAOD",
+            "Muon0_2024H_v1": "/Muon0/Run2024H-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024H_v2": "/Muon1/Run2024H-MINIv6NANOv15-v2/NANOAOD",
+            "Muon0_2024I_v1": "/Muon0/Run2024I-MINIv6NANOv15-v1/NANOAOD",
+            "Muon0_2024I_v2-v1": "/Muon0/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD",
+            "Muon1_2024I_v1": "/Muon1/Run2024I-MINIv6NANOv15-v1/NANOAOD",
+            "Muon1_2024I_v2-v1": "/Muon1/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD",
+        }
+    }
+}
+
 jetmet = {
     "2022": {
         "JetMET": {
