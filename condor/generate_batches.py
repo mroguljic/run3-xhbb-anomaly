@@ -40,7 +40,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, OUTPUT, get_store_eos_path
-from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet
+from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet, muon
 from filelists.dataset_utils import DASGOCLIENT_PATH
 
 
@@ -221,6 +221,10 @@ Examples:
             for category in jetmet[year]:
                 for dataset_name in jetmet[year][category]:
                     datasets_to_process[dataset_name] = jetmet[year][category][dataset_name]
+        if year in muon:
+            for category in muon[year]:
+                for dataset_name in muon[year][category]:
+                    datasets_to_process[dataset_name] = muon[year][category][dataset_name]
     else:
         if not args.datasets:
             parser.error("Either --datasets or --all-datasets must be specified")
@@ -254,7 +258,15 @@ Examples:
                         datasets_to_process[dataset_name] = jetmet[year][category][dataset_name]
                         found = True
                         break
-            
+
+            # Check muon
+            if not found and year in muon:
+                for category in muon[year]:
+                    if dataset_name in muon[year][category]:
+                        datasets_to_process[dataset_name] = muon[year][category][dataset_name]
+                        found = True
+                        break
+
             if not found:
                 print(f"Warning: Dataset '{dataset_name}' not found in Nano_v15.py")
     
