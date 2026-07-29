@@ -39,6 +39,7 @@ import ROOT
 
 DEFAULT_GROUP_RULES = [
     "JetMET2024=JetMET*_2024*",
+    "Muon2024=Muon*_2024*",
     "QCD=QCD*",
     "TT=TT*",
     "ZJets=Zto*Q*", # wildcard for VJets in case we want to add 3Jets later
@@ -127,8 +128,8 @@ def run_hadd(output_file: str, inputs: List[str]) -> None:
 
 
 def is_data_process(process: str) -> bool:
-    """Return True for data process names like Run2024C or JetMET0_2024C_v1."""
-    return process.startswith("Run20") or process.startswith("JetMET")
+    """Return True for data process names like Run2024C, JetMET0_2024C_v1, or Muon0_2024G_v1."""
+    return process.startswith("Run20") or process.startswith("JetMET") or process.startswith("Muon")
 
 
 def get_sum_gen_weight(template_file_path: str) -> float:
@@ -492,7 +493,7 @@ Examples:
     parser.add_argument(
         "--merge-groups",
         action="store_true",
-        help="Also produce grouped merges using wildcard rules (defaults: JetMET2024=JetMET*_2024*, QCD, TT)",
+        help="Also produce grouped merges using wildcard rules (defaults: JetMET2024=JetMET*_2024*, Muon2024=Muon*_2024*, QCD, TT)",
     )
     parser.add_argument(
         "--group-rule",
