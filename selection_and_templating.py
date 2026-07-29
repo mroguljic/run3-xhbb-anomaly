@@ -316,11 +316,11 @@ def book_trigger_efficiency_histograms(analyzer: Analyzer, data_flag: bool, year
     (cuts.REFERENCE_TRIGGER, recorded on a Muon PD) to get an unbiased-in-data denominator;
     """
 
-    leg_a_name, leg_b_name = cuts.triggers[year] # Assumes two triggers
+    dijet_trigger, pnetbb_trigger = cuts.triggers[year] # Assumes two triggers
     if len(cuts.triggers[year]) != 2:
         print(f"[WARNING]: Trigger efficiency histograms assume two trigger paths. Got {cuts.triggers[year]}")
-    analyzer.Define("trig_leg_a_pass", analyzer.GetTriggerString([leg_a_name]))
-    analyzer.Define("trig_leg_b_pass", analyzer.GetTriggerString([leg_b_name]))
+    analyzer.Define("trig_dijet_pass", analyzer.GetTriggerString([dijet_trigger]))
+    analyzer.Define("trig_pnetbb_pass", analyzer.GetTriggerString([pnetbb_trigger]))
 
     start_node = analyzer.GetActiveNode()
 
@@ -343,25 +343,25 @@ def book_trigger_efficiency_histograms(analyzer: Analyzer, data_flag: bool, year
         "m_jj_nom", "h_cand_xbb", "event_weight",
     ))
 
-    # Leg A (untagged dijet, kinematic)
+    # Untagged dijet trigger (kinematic), vs m_jj
     analyzer.SetActiveNode(denominator_node)
     histograms.append(analyzer.DataFrame.Histo1D(
-        ("trigeff_legA_total", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
+        ("trigeff_dijet_total", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
     ))
-    analyzer.Cut("trigeff_legA_pass_cut", "trig_leg_a_pass")
+    analyzer.Cut("trigeff_dijet_pass_cut", "trig_dijet_pass")
     histograms.append(analyzer.DataFrame.Histo1D(
-        ("trigeff_legA_pass", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
+        ("trigeff_dijet_pass", ";m_{jj} [GeV];Events", *M_JJ_BINS), "m_jj_nom", "event_weight",
     ))
 
-    # Leg B given leg A failed (PNet-tagged leg, conditional)
+    # PNet-tagged single-jet trigger, conditional on the dijet trigger having failed
     analyzer.SetActiveNode(denominator_node)
-    analyzer.Cut("trigeff_legB_denom_cut", "!trig_leg_a_pass")
+    analyzer.Cut("trigeff_pnetbb_denom_cut", "!trig_dijet_pass")
     histograms.append(analyzer.DataFrame.Histo1D(
-        ("trigeff_legB_given_notA_total", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
+        ("trigeff_pnetbb_given_not_dijet_total", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
     ))
-    analyzer.Cut("trigeff_legB_pass_cut", "trig_leg_b_pass")
+    analyzer.Cut("trigeff_pnetbb_pass_cut", "trig_pnetbb_pass")
     histograms.append(analyzer.DataFrame.Histo1D(
-        ("trigeff_legB_given_notA_pass", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
+        ("trigeff_pnetbb_given_not_dijet_pass", ";h candidate Xbb;Events", *SCORE_BINS), "h_cand_xbb", "event_weight",
     ))
 
     analyzer.SetActiveNode(start_node)
