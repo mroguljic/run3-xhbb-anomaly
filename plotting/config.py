@@ -20,6 +20,8 @@ OUTPUT_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 #   - y_range: [ymin, ymax] for linear y-axis limits, or None for auto
 #   - y_log_range: [ymin, ymax] for log y-axis limits, or None for auto
 #   - rebin: Rebinning factor (1 = no rebinning, 2 = 2x coarser, etc.)
+#   - ratio: Whether to add a data/MC ratio panel (default: RATIO_PANEL below).
+#            Ignored when there is no unblinded data to divide by.
 HISTOGRAMS_TO_PLOT = {
     "inclusive_m_jj": {
         "label": r"$m_{jj}$ (GeV)",
@@ -234,6 +236,16 @@ PROCESS_TYPE_DEFAULTS = {
 # Plot appearance
 FIGURE_SIZE = (8, 8)
 DPI = 300
+
+# Data/MC ratio panel (bottom panel). Only drawn when unblinded data is present.
+RATIO_PANEL = True
+RATIO_FIGURE_SIZE = (8, 9.5)
+RATIO_HEIGHT_RATIOS = (3, 1)
+RATIO_Y_RANGE = (0.0, 2.0)
+RATIO_YLABEL = "Data / MC"
+RATIO_MC_BAND_COLOR = "#9c9ca1"
+RATIO_MC_BAND_ALPHA = 0.5
+RATIO_MC_BAND_LABEL = "MC stat. unc."
 LINE_WIDTH = 2.0
 MARKER_SIZE = 6.0
 
@@ -274,3 +286,8 @@ DATA_LINE_WIDTH = 1.5
 
 # CMS style from mplhep
 CMS_STYLE = "WiP"  # or "CMS" for preliminary
+
+# Relative font scales for the mplhep CMS label: (exp, text, lumi, supp).
+# mplhep defaults are (1.3, 1.0, 0.77, 0.77); the lumi line is shrunk so
+# "<lumi> fb^-1, <year> (13.6 TeV)" fits next to "CMS Simulation".
+CMS_LABEL_FONTSCALES = (1.3, 1.0, 0.68, 0.68)

@@ -13,3 +13,4 @@ condor/*sub
 output/*
 tagger_studies/templates/*
 tagger_studies/roc/*
+fitting/output/
