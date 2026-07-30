@@ -57,6 +57,15 @@ DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "scans"
 # Sequential blue ramp, light->dark (tagger_studies/../dataviz skill palette).
 BLUE_RAMP = ["#cde2fb", "#9ec5f4", "#5598e7", "#256abf", "#104281", "#0d366b"]
 
+# Font sizes for the scan heatmap
+HEATMAP_RCPARAMS = {
+    "axes.labelsize": 15,
+    "axes.titlesize": 15,
+    "xtick.labelsize": 13,
+    "ytick.labelsize": 13,
+    "legend.fontsize": 12,
+}
+
 
 def discover_signals(merged_dir: Path) -> dict:
     """Map signal name -> (mx, my, path) for every templates_MX<mx>_MY<my>.root."""
@@ -130,34 +139,38 @@ def plot_significance_heatmap(
     best_i, best_j = np.unravel_index(np.argmax(grid), grid.shape)
     best_xbb, best_antiqcd, best_sig = xbb_edges[best_i], antiqcd_edges[best_j], grid[best_i, best_j]
 
-    fig, ax = plt.subplots(figsize=(8, 6.5))
-    # grid is (n_xbb, n_antiqcd); pcolormesh wants (rows=y, cols=x), so transpose
-    # to put anti-QCD on x and Xbb on y, matching axis labels below.
-    mesh = ax.pcolormesh(antiqcd_edges, xbb_edges, grid, cmap=cmap, vmin=0, shading="auto")
+    # plot_mass_distributions applies the (much larger) CMS style, so without
+    # this the heatmap's font size depended on whether a previous signal in the
+    # scan loop had already been plotted.
+    with plt.style.context("default"), plt.rc_context(HEATMAP_RCPARAMS):
+        fig, ax = plt.subplots(figsize=(8, 6.5))
+        # grid is (n_xbb, n_antiqcd); pcolormesh wants (rows=y, cols=x), so transpose
+        # to put anti-QCD on x and Xbb on y, matching axis labels below.
+        mesh = ax.pcolormesh(antiqcd_edges, xbb_edges, grid, cmap=cmap, vmin=0, shading="auto")
 
-    ax.scatter([best_antiqcd], [best_xbb], marker="*", s=220, color="#f5a623",
-               edgecolor="#1a1a1a", linewidth=1.0, zorder=5,
-               label=f"Best: Xbb>{best_xbb:.2f}, anti-QCD>{best_antiqcd:.2f} (Z={best_sig:.2f})")
+        ax.scatter([best_antiqcd], [best_xbb], marker="*", s=220, color="#f5a623",
+                   edgecolor="#1a1a1a", linewidth=1.0, zorder=5,
+                   label=f"Best: Xbb>{best_xbb:.2f}, anti-QCD>{best_antiqcd:.2f} (Z={best_sig:.2f})")
 
-    ax.set_xlabel("Y-candidate anti-QCD WP (score >)")
-    ax.set_ylabel("H-candidate Xbb WP (score >)")
-    ax.legend(loc="lower left", framealpha=0.9)
+        ax.set_xlabel("Y-candidate anti-QCD WP (score >)")
+        ax.set_ylabel("H-candidate Xbb WP (score >)")
+        ax.legend(loc="lower left", framealpha=0.9)
 
-    cbar = fig.colorbar(mesh, ax=ax)
-    cbar.set_label("Asimov significance Z")
+        cbar = fig.colorbar(mesh, ax=ax)
+        cbar.set_label("Significance")
 
-    mjj_lo, mjj_hi, mjy_lo, mjy_hi = window
-    ax.set_title(
-        f"{signal_name}\n"
-        f"window: $m_{{jj}}\\in[{mjj_lo:.0f},{mjj_hi:.0f}]$ GeV, "
-        f"$m_{{jY}}\\in[{mjy_lo:.0f},{mjy_hi:.0f}]$ GeV"
-    )
+        mjj_lo, mjj_hi, mjy_lo, mjy_hi = window
+        ax.set_title(
+            f"{signal_name}\n"
+            f"window: $m_{{jj}}\\in[{mjj_lo:.0f},{mjj_hi:.0f}]$ GeV, "
+            f"$m_{{jY}}\\in[{mjy_lo:.0f},{mjy_hi:.0f}]$ GeV"
+        )
 
-    fig.tight_layout()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_dir / "significance.png", dpi=200)
-    fig.savefig(output_dir / "significance.pdf")
-    plt.close(fig)
+        fig.tight_layout()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir / "significance.png", dpi=200)
+        fig.savefig(output_dir / "significance.pdf")
+        plt.close(fig)
 
 
 def plot_mass_distributions(
