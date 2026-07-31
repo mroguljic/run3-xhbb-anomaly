@@ -18,7 +18,7 @@ get scanned):
   1. Derive its own (m_jj, m_jY) integration window from its kinematic peak
      (tagger_studies/window_finder.py's fixed-fraction contour method).
   2. Skip it if that window doesn't actually contain the signal's own (MX, MY)
-     -- this happens for MY/MX ratios above ~0.2-0.3, where the Y->bb decay
+     -- this happens for MY/MX ratios above ~0.2-0.3, where the Y decay
      products are too wide-angle to merge into a single AK8 jet, so neither
      axis reconstructs the true resonance mass and any WP scan built on that
      window would not be physically meaningful.
