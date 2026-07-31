@@ -59,11 +59,7 @@ HIST_NAMES = {
 }
 
 M_JJ_REBIN = 2
-SCORE_REBIN = 100
-
-# Closure test: require this many *effective* entries per 2D cell. Templates are
-# xsec-weighted, so raw bin content is not a statistics measure (a cell holding 20
-# weighted events can be a single MC event with weight 20).
+SCORE_REBIN = 50
 CLOSURE_MIN_EFFECTIVE_ENTRIES = 50
 
 
@@ -101,6 +97,14 @@ def efficiency(total, passed):
     return x, eff, lo, hi
 
 
+def project(h2, axis, rebin, name):
+    """1D projection of a 2D trigeff_or histogram, rebinned to match the 1D measurements."""
+    h = h2.ProjectionX(name) if axis == "x" else h2.ProjectionY(name)
+    h.SetDirectory(0)
+    h.Rebin(rebin)
+    return h
+
+
 def load_process(path):
     f = ROOT.TFile.Open(path)
     if not f or f.IsZombie():
@@ -113,12 +117,19 @@ def load_process(path):
     or_pass = f.Get("trigeff_or_pass")
     or_total.SetDirectory(0)
     or_pass.SetDirectory(0)
-    f.Close()
-    return {
+    tag = os.path.basename(path).replace(".root", "")
+    hists = {
         "dijet_total": dijet_total, "dijet_pass": dijet_pass,
         "pnetbb_total": pnetbb_total, "pnetbb_pass": pnetbb_pass,
         "or_total": or_total, "or_pass": or_pass,
     }
+    # 1D OR efficiencies
+    for var, axis, rebin in (("mjj", "x", M_JJ_REBIN), ("xbb", "y", SCORE_REBIN)):
+        for which in ("total", "pass"):
+            hists[f"or_{var}_{which}"] = project(
+                hists[f"or_{which}"], axis, rebin, f"or_{var}_{which}_{tag}")
+    f.Close()
+    return hists
 
 
 def efficiency_by_bin(total, passed):
@@ -338,6 +349,18 @@ def main():
         data_hists, mc_hists, "pnetbb_total", "pnetbb_pass", "h candidate Xbb",
         f"{PNETBB_TRIGGER_SHORT}\nand not {DIJET_TRIGGER_SHORT}",
         os.path.join(args.out_dir, "pnetbb_efficiency_sf.png"),
+    )
+
+    or_legend_title = f"{DIJET_TRIGGER_SHORT}\nOR {PNETBB_TRIGGER_SHORT}"
+    plot_trigger_efficiency_and_sf(
+        data_hists, mc_hists, "or_mjj_total", "or_mjj_pass", "$m_{jj}$ [GeV]",
+        or_legend_title,
+        os.path.join(args.out_dir, "or_efficiency_sf_mjj.png"),
+    )
+    plot_trigger_efficiency_and_sf(
+        data_hists, mc_hists, "or_xbb_total", "or_xbb_pass", "h candidate Xbb",
+        or_legend_title,
+        os.path.join(args.out_dir, "or_efficiency_sf_xbb.png"),
     )
 
     plot_2d_efficiency_map(
