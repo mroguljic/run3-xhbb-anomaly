@@ -22,6 +22,7 @@ M_JY_BINS = (112, 40, 600)
 JET_PT_BINS = (100, 300, 2000)
 JET_ETA_BINS = (50, -2.5, 2.5)
 ABS_DELTA_ETA_BINS = (48, 0, 4.8)
+M_JJ_WIDE_BINS = (80, 0, 4000)
 JET_PHI_BINS = (32, -3.2, 3.2)
 JET_MASS_BINS = (80, 0, 300)
 SCORE_BINS = (1000, 0, 1)
@@ -246,7 +247,7 @@ def book_tagger_scan_histogram(analyzer: Analyzer):
     return analyzer.DataFrame.HistoND(model, columns)
 
 
-def book_eta_pt_diagnostics(analyzer: Analyzer) -> list:
+def book_eta_pt_diagnostics(analyzer: Analyzer, prefix: str = "inclusive_") -> list:
     """Book the joint (eta, pT) distribution of each jet.
 
     The 1D eta and pT diagnostics both show data/MC features, but eta and pT are
@@ -260,7 +261,7 @@ def book_eta_pt_diagnostics(analyzer: Analyzer) -> list:
     return [
         analyzer.DataFrame.Histo2D(
             (
-                f"inclusive_{jet}_jet_eta_vs_pt",
+                f"{prefix}{jet}_jet_eta_vs_pt",
                 f";{label} jet #eta;{label} jet p_{{T}} [GeV]",
                 *JET_ETA_BINS,
                 *JET_PT_BINS,
@@ -273,30 +274,65 @@ def book_eta_pt_diagnostics(analyzer: Analyzer) -> list:
     ]
 
 
-def book_dijet_angular_diagnostics(analyzer: Analyzer) -> list:
+def book_dijet_angular_diagnostics(analyzer: Analyzer, prefix: str = "inclusive_", mjj_bins: tuple = M_JJ_BINS) -> list:
     """Book |dEta| and its correlations with m_jj and jet pT."""
     return [
         analyzer.DataFrame.Histo1D(
-            ("inclusive_abs_delta_eta", ";|#Delta#eta_{jj}|;Events", *ABS_DELTA_ETA_BINS),
+            (f"{prefix}abs_delta_eta", ";|#Delta#eta_{jj}|;Events", *ABS_DELTA_ETA_BINS),
             "abs_delta_eta", "nominal_weight",
         ),
         analyzer.DataFrame.Histo2D(
-            ("inclusive_abs_delta_eta_vs_m_jj", ";|#Delta#eta_{jj}|;m_{jj} [GeV]", *ABS_DELTA_ETA_BINS, *M_JJ_BINS),
+            (f"{prefix}abs_delta_eta_vs_m_jj", ";|#Delta#eta_{jj}|;m_{jj} [GeV]", *ABS_DELTA_ETA_BINS, *mjj_bins),
             "abs_delta_eta", "m_jj_nom", "nominal_weight",
         ),
         analyzer.DataFrame.Histo2D(
-            ("inclusive_abs_delta_eta_vs_lead_jet_pt", ";|#Delta#eta_{jj}|;leading jet p_{T} [GeV]", *ABS_DELTA_ETA_BINS, *JET_PT_BINS),
+            (f"{prefix}abs_delta_eta_vs_lead_jet_pt", ";|#Delta#eta_{jj}|;leading jet p_{T} [GeV]", *ABS_DELTA_ETA_BINS, *JET_PT_BINS),
             "abs_delta_eta", "lead_jet_pt", "nominal_weight",
         ),
         analyzer.DataFrame.Histo2D(
-            ("inclusive_lead_jet_pt_vs_m_jj", ";leading jet p_{T} [GeV];m_{jj} [GeV]", *JET_PT_BINS, *M_JJ_BINS),
+            (f"{prefix}lead_jet_pt_vs_m_jj", ";leading jet p_{T} [GeV];m_{jj} [GeV]", *JET_PT_BINS, *mjj_bins),
             "lead_jet_pt", "m_jj_nom", "nominal_weight",
         ),
         analyzer.DataFrame.Histo2D(
-            ("inclusive_lead_jet_eta_vs_sublead_jet_eta", ";leading jet #eta;subleading jet #eta", *JET_ETA_BINS, *JET_ETA_BINS),
+            (f"{prefix}lead_jet_eta_vs_sublead_jet_eta", ";leading jet #eta;subleading jet #eta", *JET_ETA_BINS, *JET_ETA_BINS),
             "lead_jet_eta", "sublead_jet_eta", "nominal_weight",
         ),
     ]
+
+
+def book_mass_pt_diagnostics(analyzer: Analyzer, prefix: str = "inclusive_") -> list:
+    """Book candidate soft-drop mass vs pT, and m_jj over its full range."""
+    return [
+        analyzer.DataFrame.Histo2D(
+            (f"{prefix}h_cand_msd_vs_pt", ";H candidate m_{SD} [GeV];H candidate p_{T} [GeV]", *JET_MASS_BINS, *JET_PT_BINS),
+            "h_cand_msd_nom", "h_cand_pt_nom", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo2D(
+            (f"{prefix}y_cand_msd_vs_pt", ";Y candidate m_{SD} [GeV];Y candidate p_{T} [GeV]", *JET_MASS_BINS, *JET_PT_BINS),
+            "y_cand_msd_nom", "y_cand_pt_nom", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo1D(
+            (f"{prefix}m_jj_wide", ";m_{jj} [GeV];Events", *M_JJ_WIDE_BINS),
+            "m_jj_nom", "nominal_weight",
+        ),
+    ]
+
+
+def book_trigger_only_diagnostics(analyzer: Analyzer) -> list:
+    """Book diagnostics with the trigger applied but no mass/m_jj/pT cuts.
+
+    Everything else is booked downstream of the full kinematic selection, so a
+    data/MC feature there cannot be attributed to the parent spectrum rather than
+    to the cuts sculpting it. These are the same distributions before that
+    sculpting, and they cover the mass range outside the H window and the m_jj
+    range below 900 that the inclusive histograms cannot see at all.
+    """
+    prefix = "trigonly_"
+    histograms = book_diagnostics(analyzer, prefix)
+    histograms.extend(book_eta_pt_diagnostics(analyzer, prefix))
+    histograms.extend(book_dijet_angular_diagnostics(analyzer, prefix, mjj_bins=M_JJ_WIDE_BINS))
+    histograms.extend(book_mass_pt_diagnostics(analyzer, prefix))
+    return histograms
 
 
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
@@ -500,6 +536,8 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     analyzer.Cut("variation_cutflow_trigger", "trigger_pass")
     common_no_pt_node = analyzer.GetActiveNode()
 
+    trigger_only_histograms = book_trigger_only_diagnostics(analyzer)
+
     # Restore the active node to the nominal line for the corrections/diagnostics/region-booking below.
     analyzer.SetActiveNode(nominal_common_node)
 
@@ -584,6 +622,7 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
 
     output_file = ROOT.TFile(output_file_path, "RECREATE")
     write_histograms(output_file, inclusive_histograms)
+    write_histograms(output_file, trigger_only_histograms)
     write_histograms(output_file, region_histograms)
     write_histograms(output_file, trigger_efficiency_histograms)
     if not data_flag:
