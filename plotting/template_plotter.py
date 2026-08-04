@@ -36,6 +36,17 @@ from plotting.config import (
     RATIO_MC_BAND_COLOR,
     RATIO_MC_BAND_ALPHA,
     RATIO_MC_BAND_LABEL,
+    REGION_TEXT_BOX,
+    REGION_TEXT_FONTSIZE,
+    REGION_TEXT_POSITION,
+    REGION_TEXT_BBOX,
+    get_region_text,
+    LEGEND_NCOL,
+    Y_AUTO_RANGE,
+    Y_PEAK_FRACTION,
+    Y_HEADROOM_LOG_MAX_DECADES,
+    Y_LOG_BOTTOM_PAD_DECADES,
+    Y_LOG_MAX_DECADES,
 )
 from filelists.xsecs import get_int_lumi
 
@@ -55,6 +66,57 @@ def get_lumi_fb(year: Optional[str]) -> Optional[float]:
         return None
 
 
+def visible_values(
+    bin_contents: np.ndarray,
+    bin_edges: np.ndarray,
+    x_range: Optional[Tuple[float, float]],
+) -> np.ndarray:
+    """Bin contents whose bin centers fall inside the plotted x range."""
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+    if x_range is None:
+        return bin_contents
+    inside = (bin_centers >= x_range[0]) & (bin_centers <= x_range[1])
+    return bin_contents[inside]
+
+
+def auto_y_range(
+    drawn_values: List[np.ndarray],
+    log_y: bool,
+) -> Optional[Tuple[float, float]]:
+    """
+    y-axis limits leaving headroom above the peak for the legend and region box.
+
+    `drawn_values` holds every curve actually shown (stack total, data + its error
+    bars, each signal), already restricted to the plotted x range. Returns None if
+    there is nothing positive to scale to.
+    """
+    if not drawn_values:
+        return None
+
+    all_values = np.concatenate(drawn_values)
+    all_values = all_values[np.isfinite(all_values)]
+    positive = all_values[all_values > 0]
+    if positive.size == 0:
+        return None
+
+    peak = positive.max()
+
+    if not log_y:
+        return 0.0, peak / Y_PEAK_FRACTION
+
+    bottom = max(
+        positive.min() * 10**-Y_LOG_BOTTOM_PAD_DECADES,
+        peak * 10**-Y_LOG_MAX_DECADES,
+    )
+    # Put the peak at Y_PEAK_FRACTION of the panel height, measured in decades
+    decades_below = np.log10(peak / bottom)
+    decades_above = min(
+        decades_below * (1.0 - Y_PEAK_FRACTION) / Y_PEAK_FRACTION,
+        Y_HEADROOM_LOG_MAX_DECADES,
+    )
+    return bottom, peak * 10**decades_above
+
+
 def plot_histogram(
     histogram_name: str,
     nice_label: str,
@@ -66,6 +128,7 @@ def plot_histogram(
     x_range: Optional[Tuple[float, float]] = None,
     y_range: Optional[Tuple[float, float]] = None,
     ratio_panel: bool = RATIO_PANEL,
+    region_text: Optional[str] = None,
 ) -> None:
     """
     Create a stacked plot with background, data, and signal overlays.
@@ -81,6 +144,7 @@ def plot_histogram(
         x_range: Optional (xmin, xmax) for x-axis limits
         y_range: Optional (ymin, ymax) for y-axis limits
         ratio_panel: Whether to add a data/MC ratio panel (skipped if data is absent/blinded)
+        region_text: Text for the in-plot region box (None/empty draws no box)
 
     Raises:
         ValueError: If required process types are missing
@@ -133,6 +197,9 @@ def plot_histogram(
     total_bkg = np.zeros(len(bin_edges) - 1)
     total_bkg_err2 = np.zeros(len(bin_edges) - 1)
 
+    # Curves actually drawn, restricted to the plotted x range, for the y-axis autoscale
+    drawn_values: List[np.ndarray] = []
+
     for process_key in background_processes:
         process_config = PROCESSES[process_key]
         _, bin_contents, bin_errors, _ = histogram_data[process_key]
@@ -154,6 +221,7 @@ def plot_histogram(
             edgecolor="none",
             linewidth=0.5,
         )
+        drawn_values.append(visible_values(total_bkg, bin_edges, x_range))
 
     # Plot data with error bars
     for data_key in data_processes:
@@ -172,6 +240,8 @@ def plot_histogram(
             label=data_config.get("label", data_key),
             zorder=10,
         )
+        # Include the error bar so its top cap is not clipped by the axis
+        drawn_values.append(visible_values(bin_contents + bin_errors, bin_edges, x_range))
 
     # Plot signal
     for signal_key in signal_processes:
@@ -188,6 +258,7 @@ def plot_histogram(
             label=signal_config.get("label", signal_key),
             zorder=5,
         )
+        drawn_values.append(visible_values(bin_contents, signal_bin_edges, x_range))
 
     # Ratio panel: data / total background, with the MC stat uncertainty as a band around 1
     if draw_ratio:
@@ -245,21 +316,44 @@ def plot_histogram(
         ax.set_xlabel(nice_label, fontsize=XLABEL_FONTSIZE)
     ax.set_ylabel("Events", fontsize=YLABEL_FONTSIZE)
 
-    # Apply axis ranges (shared x-axis propagates to the ratio panel)
+    # Apply axis ranges (shared x-axis propagates to the ratio panel).
+    # The scale is set before the limits so a log axis never sees a zero bottom.
     if x_range is not None:
         ax.set_xlim(x_range)
-    if y_range is not None:
-        ax.set_ylim(y_range)
 
-    # Apply log scale if requested
     if log_y:
         ax.set_yscale("log")
+
+    if y_range is None and Y_AUTO_RANGE:
+        y_range = auto_y_range(drawn_values, log_y)
+    if y_range is not None:
+        ax.set_ylim(y_range)
 
     # Legend
     ax.legend(
         loc=LEGEND_LOC,
         fontsize=LEGEND_FONTSIZE,
+        ncol=LEGEND_NCOL,
+        columnspacing=1.0,
+        handlelength=1.2,
+        handletextpad=0.5,
+        borderaxespad=0.5,
     )
+
+    # Region text box (inside the main panel, opposite the legend)
+    if REGION_TEXT_BOX and region_text:
+        ax.text(
+            REGION_TEXT_POSITION[0],
+            REGION_TEXT_POSITION[1],
+            region_text,
+            transform=ax.transAxes,
+            fontsize=REGION_TEXT_FONTSIZE,
+            va="top",
+            ha="left",
+            linespacing=1.4,
+            bbox=REGION_TEXT_BBOX,
+            zorder=20,
+        )
 
     # Grid and tick layering
     ax.grid(False)
@@ -331,6 +425,8 @@ def plot_all_histograms(
             y_range = hist_config.get("y_range")
             y_log_range = hist_config.get("y_log_range")
             ratio_panel = hist_config.get("ratio", RATIO_PANEL)
+            # Explicit "region_text" in the config wins (including None to suppress it)
+            region_text = hist_config.get("region_text", get_region_text(hist_name, year))
 
             # Extract data for this histogram from all processes
             hist_data = {}
@@ -356,6 +452,7 @@ def plot_all_histograms(
                 x_range=x_range,
                 y_range=y_range,
                 ratio_panel=ratio_panel,
+                region_text=region_text,
             )
 
             # Plot log version if requested
@@ -372,6 +469,7 @@ def plot_all_histograms(
                     x_range=x_range,
                     y_range=y_log_range,
                     ratio_panel=ratio_panel,
+                    region_text=region_text,
                 )
 
         except Exception as e:

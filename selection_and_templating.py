@@ -244,6 +244,33 @@ def book_tagger_scan_histogram(analyzer: Analyzer):
     return analyzer.DataFrame.HistoND(model, columns)
 
 
+def book_eta_pt_diagnostics(analyzer: Analyzer) -> list:
+    """Book the joint (eta, pT) distribution of each jet.
+
+    The 1D eta and pT diagnostics both show data/MC features, but eta and pT are
+    correlated in QCD, so a mismodeling of either one shows up in the other and the
+    1D plots cannot separate them. The joint distribution can: see
+    plotting/eta_pt_diagnostic.py, which reads these to test whether the data/MC
+    ratio factorises as f(eta) and to reweight MC in eta and re-project pT.
+    Binning matches JET_ETA_BINS/JET_PT_BINS, so the projections of these reproduce
+    the corresponding 1D diagnostics exactly.
+    """
+    return [
+        analyzer.DataFrame.Histo2D(
+            (
+                f"inclusive_{jet}_jet_eta_vs_pt",
+                f";{label} jet #eta;{label} jet p_{{T}} [GeV]",
+                *JET_ETA_BINS,
+                *JET_PT_BINS,
+            ),
+            f"{jet}_jet_eta",
+            f"{jet}_jet_pt",
+            "nominal_weight",
+        )
+        for jet, label in (("lead", "leading"), ("sublead", "subleading"))
+    ]
+
+
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
     """Book nominal diagnostics after the common selection and before region splits."""
     histograms = book_diagnostics(analyzer, "inclusive_")
@@ -254,6 +281,7 @@ def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
             book_tagger_scan_histogram(analyzer),
         ]
     )
+    histograms.extend(book_eta_pt_diagnostics(analyzer))
     return histograms
 
 

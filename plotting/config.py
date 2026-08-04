@@ -3,6 +3,7 @@ Plotting configuration for template histograms.
 """
 
 from pathlib import Path
+from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -251,7 +252,58 @@ MARKER_SIZE = 6.0
 
 # Legend settings
 LEGEND_LOC = "upper right"
-LEGEND_FONTSIZE = 20
+LEGEND_FONTSIZE = 17
+LEGEND_NCOL = 2
+
+# Automatic y-axis headroom, so the legend and region box do not sit on top of
+# the histograms. Used only when the histogram has no explicit "y_range" /
+# "y_log_range" in HISTOGRAMS_TO_PLOT; the peak is measured inside the plotted x_range
+Y_AUTO_RANGE = True
+# The tallest drawn point is placed at this fraction of the panel height, leaving
+# the rest free for the legend and region box.
+Y_PEAK_FRACTION = 0.72
+# Log scale: never add more than this many decades above the peak
+Y_HEADROOM_LOG_MAX_DECADES = 4.0
+# Log scale bottom: this far below the smallest positive value drawn, but never
+# more than Y_LOG_MAX_DECADES below the peak
+Y_LOG_BOTTOM_PAD_DECADES = 0.5
+Y_LOG_MAX_DECADES = 7.0
+
+# Region text box: an in-plot annotation naming the (H tag, Y tag) region a
+# histogram belongs to, derived from its name prefix (e.g. "PC_m_jj" -> Pass/Control).
+# Per-histogram override: set "region_text" in HISTOGRAMS_TO_PLOT (a string, or
+# None/"" to suppress the box for that histogram).
+REGION_TEXT_BOX = True
+REGION_TEXT_FONTSIZE = 17
+REGION_TEXT_POSITION = (0.02, 0.96)  # axes fraction, top-left corner of the box
+REGION_TEXT_BBOX = {
+    "boxstyle": "round",
+    "facecolor": "white",
+    "edgecolor": CMS_COLORS["gray"],
+    "alpha": 0.8,
+}
+
+# Histogram-name prefix -> label shown in the region box. The prefix is the
+# (H tag, Y tag) region encoding written by selection_and_templating.py
+REGION_PREFIX_TITLES = {
+    "PS": "Pass / Signal",
+    "PC": "Pass / Control",
+    "FS": "Fail / Signal",
+    "FC": "Fail / Control",
+    "inclusive": "Inclusive",
+}
+
+
+def get_region_text(histogram_name: str, year: Optional[str] = None) -> Optional[str]:
+    """
+    Text for the in-plot region box of a histogram, or None if it has no region.
+
+    The region is taken from the histogram name prefix (the part before the first
+    underscore). `year` is accepted for interface stability but unused: only the
+    region name is shown, not the tagger working point values.
+    """
+    prefix = histogram_name.split("_")[0]
+    return REGION_PREFIX_TITLES.get(prefix)
 
 # Axis settings
 XLABEL_FONTSIZE = 22
@@ -284,8 +336,8 @@ DATA_MARKER = "o"
 DATA_MARKERSIZE = 5
 DATA_LINE_WIDTH = 1.5
 
-# CMS style from mplhep
-CMS_STYLE = "WiP"  # or "CMS" for preliminary
+
+CMS_STYLE = "WiP"
 
 # Relative font scales for the mplhep CMS label: (exp, text, lumi, supp).
 # mplhep defaults are (1.3, 1.0, 0.77, 0.77); the lumi line is shrunk so

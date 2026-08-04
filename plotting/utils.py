@@ -91,6 +91,58 @@ def read_histograms_from_files(
     return data
 
 
+def read_histogram2d_from_root(
+    file_path: str,
+    hist_name: str,
+    rebin_x: int = 1,
+    rebin_y: int = 1,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Read a 2D histogram from a ROOT file and convert to numpy arrays.
+
+    Args:
+        file_path: Path to ROOT file
+        hist_name: Name of histogram in ROOT file
+        rebin_x: Rebinning factor along x (1 = no rebinning)
+        rebin_y: Rebinning factor along y (1 = no rebinning)
+
+    Returns:
+        Tuple of (contents, errors, x_edges, y_edges), where contents and errors
+        have shape (n_bins_x, n_bins_y). Under/overflow are not included.
+
+    Raises:
+        FileNotFoundError: If ROOT file not found
+        RuntimeError: If histogram not found in file or is not 2D
+    """
+    root_file = ROOT.TFile(file_path, "READ")
+    if not root_file or root_file.IsZombie():
+        raise FileNotFoundError(f"Cannot open ROOT file: {file_path}")
+
+    hist = root_file.Get(hist_name)
+    if not hist:
+        root_file.Close()
+        raise RuntimeError(f"Histogram '{hist_name}' not found in {file_path}")
+    if not hist.InheritsFrom("TH2"):
+        root_file.Close()
+        raise RuntimeError(f"Histogram '{hist_name}' in {file_path} is not 2D")
+
+    if rebin_x > 1 or rebin_y > 1:
+        hist.Rebin2D(rebin_x, rebin_y)
+
+    n_x, n_y = hist.GetNbinsX(), hist.GetNbinsY()
+    x_edges = np.array([hist.GetXaxis().GetBinLowEdge(i) for i in range(1, n_x + 2)])
+    y_edges = np.array([hist.GetYaxis().GetBinLowEdge(i) for i in range(1, n_y + 2)])
+    contents = np.array(
+        [[hist.GetBinContent(i, j) for j in range(1, n_y + 1)] for i in range(1, n_x + 1)]
+    )
+    errors = np.array(
+        [[hist.GetBinError(i, j) for j in range(1, n_y + 1)] for i in range(1, n_x + 1)]
+    )
+
+    root_file.Close()
+    return contents, errors, x_edges, y_edges
+
+
 def identify_signal_processes(process_names: List[str]) -> List[str]:
     """
     Identify signal processes from list of process names.
