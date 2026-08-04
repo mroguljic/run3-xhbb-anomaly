@@ -21,6 +21,7 @@ M_JJ_BINS = (66, 700, 4000)
 M_JY_BINS = (112, 40, 600)
 JET_PT_BINS = (100, 300, 2000)
 JET_ETA_BINS = (50, -2.5, 2.5)
+ABS_DELTA_ETA_BINS = (48, 0, 4.8)
 JET_PHI_BINS = (32, -3.2, 3.2)
 JET_MASS_BINS = (80, 0, 300)
 SCORE_BINS = (1000, 0, 1)
@@ -86,6 +87,7 @@ def define_common_columns(analyzer: Analyzer, data_flag: bool, year: str) -> Non
     analyzer.Define("sublead_jet_mreg", "FatJet_regressed_mass[1]")
     analyzer.Define("lead_jet_mass", "FatJet_mass[0]")
     analyzer.Define("sublead_jet_mass", "FatJet_mass[1]")
+    analyzer.Define("abs_delta_eta", "std::abs(lead_jet_eta - sublead_jet_eta)")
 
 def apply_y_mass_cut(analyzer: Analyzer, year: str, jec_variation: str, cut_name_prefix: str) -> None:
     """Apply the Y-candidate mass cut."""
@@ -271,6 +273,32 @@ def book_eta_pt_diagnostics(analyzer: Analyzer) -> list:
     ]
 
 
+def book_dijet_angular_diagnostics(analyzer: Analyzer) -> list:
+    """Book |dEta| and its correlations with m_jj and jet pT."""
+    return [
+        analyzer.DataFrame.Histo1D(
+            ("inclusive_abs_delta_eta", ";|#Delta#eta_{jj}|;Events", *ABS_DELTA_ETA_BINS),
+            "abs_delta_eta", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo2D(
+            ("inclusive_abs_delta_eta_vs_m_jj", ";|#Delta#eta_{jj}|;m_{jj} [GeV]", *ABS_DELTA_ETA_BINS, *M_JJ_BINS),
+            "abs_delta_eta", "m_jj_nom", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo2D(
+            ("inclusive_abs_delta_eta_vs_lead_jet_pt", ";|#Delta#eta_{jj}|;leading jet p_{T} [GeV]", *ABS_DELTA_ETA_BINS, *JET_PT_BINS),
+            "abs_delta_eta", "lead_jet_pt", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo2D(
+            ("inclusive_lead_jet_pt_vs_m_jj", ";leading jet p_{T} [GeV];m_{jj} [GeV]", *JET_PT_BINS, *M_JJ_BINS),
+            "lead_jet_pt", "m_jj_nom", "nominal_weight",
+        ),
+        analyzer.DataFrame.Histo2D(
+            ("inclusive_lead_jet_eta_vs_sublead_jet_eta", ";leading jet #eta;subleading jet #eta", *JET_ETA_BINS, *JET_ETA_BINS),
+            "lead_jet_eta", "sublead_jet_eta", "nominal_weight",
+        ),
+    ]
+
+
 def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
     """Book nominal diagnostics after the common selection and before region splits."""
     histograms = book_diagnostics(analyzer, "inclusive_")
@@ -282,6 +310,7 @@ def book_inclusive_diagnostics(analyzer: Analyzer) -> list:
         ]
     )
     histograms.extend(book_eta_pt_diagnostics(analyzer))
+    histograms.extend(book_dijet_angular_diagnostics(analyzer))
     return histograms
 
 
