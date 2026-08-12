@@ -82,7 +82,7 @@ def transfer_output_to_store(local_output: str, remote_output: str) -> None:
     Raises:
         RuntimeError: If xrdcp fails.
     """
-    cmd = f"xrdcp '{local_output}' '{remote_output}'"
+    cmd = f"xrdcp -f '{local_output}' '{remote_output}'"
     print(f"Transferring output...\n  {local_output}\n  -> {remote_output}")
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
