@@ -1,4 +1,4 @@
-#2022 and 2023 need to be reprocessed by CMS so only few MC datasets are available. Until that is done, we will focus on 2024 only
+# 2025 MC: the Summer24 MC below is shared with 2025, split 1:1 by event number
 mc_bkg = {
     "2022": {
         "TTbar": {
@@ -113,6 +113,24 @@ muon = {
             "Muon1_2024I_v1": "/Muon1/Run2024I-MINIv6NANOv15-v1/NANOAOD",
             "Muon1_2024I_v2-v1": "/Muon1/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD",
         }
+    },
+    "2025": {
+        "Muon": {
+            "Muon0_2025C_v1": "/Muon0/Run2025C-PromptReco-v1/NANOAOD",
+            "Muon0_2025C_v2": "/Muon0/Run2025C-PromptReco-v2/NANOAOD",
+            "Muon0_2025D_v1": "/Muon0/Run2025D-PromptReco-v1/NANOAOD",
+            "Muon0_2025E_v1": "/Muon0/Run2025E-PromptReco-v1/NANOAOD",
+            "Muon0_2025F_v1": "/Muon0/Run2025F-PromptReco-v1/NANOAOD",
+            "Muon0_2025F_v2": "/Muon0/Run2025F-PromptReco-v2/NANOAOD",
+            "Muon0_2025G_v1": "/Muon0/Run2025G-PromptReco-v1/NANOAOD",
+            "Muon1_2025C_v1": "/Muon1/Run2025C-PromptReco-v1/NANOAOD",
+            "Muon1_2025C_v2": "/Muon1/Run2025C-PromptReco-v2/NANOAOD",
+            "Muon1_2025D_v1": "/Muon1/Run2025D-PromptReco-v1/NANOAOD",
+            "Muon1_2025E_v1": "/Muon1/Run2025E-PromptReco-v1/NANOAOD",
+            "Muon1_2025F_v1": "/Muon1/Run2025F-PromptReco-v1/NANOAOD",
+            "Muon1_2025F_v2": "/Muon1/Run2025F-PromptReco-v2/NANOAOD",
+            "Muon1_2025G_v1": "/Muon1/Run2025G-PromptReco-v1/NANOAOD",
+        }
     }
 }
 
@@ -160,6 +178,24 @@ jetmet = {
             "JetMET0_2024I_v2-v1": "/JetMET0/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD",
             "JetMET1_2024I_v1": "/JetMET1/Run2024I-MINIv6NANOv15-v1/NANOAOD",
             "JetMET1_2024I_v2-v2": "/JetMET1/Run2024I-MINIv6NANOv15_v2-v2/NANOAOD"
+        }
+    },
+    "2025": {
+        "JetMET": {
+            "JetMET0_2025C_v1": "/JetMET0/Run2025C-PromptReco-v1/NANOAOD",
+            "JetMET0_2025C_v2": "/JetMET0/Run2025C-PromptReco-v2/NANOAOD",
+            "JetMET0_2025D_v1": "/JetMET0/Run2025D-PromptReco-v1/NANOAOD",
+            "JetMET0_2025E_v1": "/JetMET0/Run2025E-PromptReco-v1/NANOAOD",
+            "JetMET0_2025F_v1": "/JetMET0/Run2025F-PromptReco-v1/NANOAOD",
+            "JetMET0_2025F_v2": "/JetMET0/Run2025F-PromptReco-v2/NANOAOD",
+            "JetMET0_2025G_v1": "/JetMET0/Run2025G-PromptReco-v1/NANOAOD",
+            "JetMET1_2025C_v1": "/JetMET1/Run2025C-PromptReco-v1/NANOAOD",
+            "JetMET1_2025C_v2": "/JetMET1/Run2025C-PromptReco-v2/NANOAOD",
+            "JetMET1_2025D_v1": "/JetMET1/Run2025D-PromptReco-v1/NANOAOD",
+            "JetMET1_2025E_v1": "/JetMET1/Run2025E-PromptReco-v1/NANOAOD",
+            "JetMET1_2025F_v1": "/JetMET1/Run2025F-PromptReco-v1/NANOAOD",
+            "JetMET1_2025F_v2": "/JetMET1/Run2025F-PromptReco-v2/NANOAOD",
+            "JetMET1_2025G_v1": "/JetMET1/Run2025G-PromptReco-v1/NANOAOD",
         }
     }
 }

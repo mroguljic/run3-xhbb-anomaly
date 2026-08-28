@@ -22,7 +22,7 @@ OUTPUT = {
 # Controller Defaults
 # ============================================================================
 
-YEARS_TO_PROCESS = ["2022", "2023", "2024"]
+YEARS_TO_PROCESS = ["2022", "2023", "2024", "2025"]
 DEFAULT_YEAR = "2024"
 
 AUTO_SUBMIT = False

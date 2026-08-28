@@ -1,11 +1,13 @@
+import copy
+
 PRESELECTION_CUTS = {
     "2024": {
         "valid_fatjet_pt_min": 300,
         "valid_fatjet_abs_eta_max": 2.4,
         "valid_fatjet_mass_min": 40,
+        "m_jj_skim_min": 800, # Looser than final cut, to allow studying if a lower cut could work
     }
 }
-
 
 REGION_CUTS = {
     "2024": {
@@ -33,15 +35,6 @@ TEMPLATE_TAGGING_WPS = {
     }
 }
 
-# Region boundaries as (lower, upper) tuples. None means unbounded.
-TEMPLATE_REGION_BOUNDARIES = {
-    "2024": {
-        "Pass": (TEMPLATE_TAGGING_WPS["2024"]["h_xbb_wp"], None),
-        "Fail": (TEMPLATE_TAGGING_WPS["2024"]["h_xbb_wp_lo"], TEMPLATE_TAGGING_WPS["2024"]["h_xbb_wp"]),
-        "Signal": (TEMPLATE_TAGGING_WPS["2024"]["y_antiqcd_wp"], None),
-        "Control": (TEMPLATE_TAGGING_WPS["2024"]["y_antiqcd_wp_lo"], TEMPLATE_TAGGING_WPS["2024"]["y_antiqcd_wp"]), 
-    }
-}
 
 TEMPLATE_REGIONS = {
     "2024": [
@@ -61,4 +54,19 @@ triggers = {
 
 REFERENCE_TRIGGER = {
     "2024": "HLT_Mu50",
+}
+
+#Apply same selection in 2025 as in 2024
+for config in [PRESELECTION_CUTS, REGION_CUTS, TEMPLATE_SELECTION, TEMPLATE_TAGGING_WPS, TEMPLATE_REGIONS, triggers, REFERENCE_TRIGGER]:
+    config["2025"] = copy.deepcopy(config["2024"])
+
+
+TEMPLATE_REGION_BOUNDARIES = {
+    year: {
+        "Pass":    (wps["h_xbb_wp"], None),
+        "Fail":    (wps["h_xbb_wp_lo"], wps["h_xbb_wp"]),
+        "Signal":  (wps["y_antiqcd_wp"], None),
+        "Control": (wps["y_antiqcd_wp_lo"], wps["y_antiqcd_wp"]),
+    }
+    for year, wps in TEMPLATE_TAGGING_WPS.items()
 }

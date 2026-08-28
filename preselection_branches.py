@@ -33,9 +33,9 @@ COMMON_SNAPSHOT_COLUMNS: list[str] = [
     "LHEScaleWeight",  # QCD renormalization + factorization
 ]
 
-
 YEAR_EXTRA_COLUMNS: Dict[str, List[str]] = {
     "2024": [],
+    "2025": [],
 }
 
 

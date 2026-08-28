@@ -110,11 +110,11 @@ def event_preselection(options: OptionParser) -> None:
 
     analyzer.Define("FatJet_regressed_mass", "FatJet_globalParT3_massCorrGeneric * FatJet_mass * (1.0 - FatJet_rawFactor)")
 
-    jetid_file = corrections_paths.corrections[year]["JetID"]
-    jetveto_file = corrections_paths.corrections[year]["JetVetoMap"]
+    jetid_file = corrections_paths.get_correction_path(year, "JetID")
+    jetveto_file = corrections_paths.get_correction_path(year, "JetVetoMap")
     AutoJetID.AutoJetID(analyzer, correction_file=jetid_file, jet_types=["Jet", "FatJet"])
-    AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.corrections[year]["JEC_AK4"], corrections_paths.corrections[year]["JEC_AK8"]], dataEra=era, verbose=False)
-    AutoJME.AutoJME_mSD(analyzer, jec_path=corrections_paths.corrections[year]["JEC_AK4"], dataEra=era, verbose=False)
+    AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.get_correction_path(year, "JEC_AK4"), corrections_paths.get_correction_path(year, "JEC_AK8")], dataEra=era, verbose=False)
+    AutoJME.AutoJME_mSD(analyzer, jec_path=corrections_paths.get_correction_path(year, "JEC_AK4"), dataEra=era, verbose=False)
     AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
 
     # We use JES__up in MC because it has the highest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
@@ -174,15 +174,22 @@ def event_preselection(options: OptionParser) -> None:
         )
         analyzer.Define(f"m_jj_{jec_variation}", f"hardware::InvariantMass({{h_cand_vec_{jec_variation}, y_cand_vec_{jec_variation}}})")
 
+    m_jj_skim_expression = " || ".join(
+        f"m_jj_{jec_variation} > {preselection_cuts['m_jj_skim_min']}" for jec_variation in jec_variations
+    )
+    analyzer.Cut("m_jj_skim", m_jj_skim_expression)
+    n_mjj_skim = get_n_events(analyzer)
+    n_mjj_skim_weighted = get_n_weighted(analyzer, data_flag)
+
     snapshot_columns = get_preselection_snapshot_columns(year)
 
     analyzer.Snapshot(snapshot_columns, options.output, "Events", lazy=False, openOption="RECREATE", saveRunChain=True)
 
-    cutflow_labels = ["Total", "Lumi mask", "MET Filters", ">1 fatjets", "Two valid fatjets"]
-    h_cutflow = build_cutflow_histogram(cutflow_labels, [n_total, n_lumi, n_met, n_one_fatjet, n_two_valid_fatjets], "h_cutflow", "Cutflow; Cut; Events")
+    cutflow_labels = ["Total", "Lumi mask", "MET Filters", ">1 fatjets", "Two valid fatjets", f"m_jj > {preselection_cuts['m_jj_skim_min']}"]
+    h_cutflow = build_cutflow_histogram(cutflow_labels, [n_total, n_lumi, n_met, n_one_fatjet, n_two_valid_fatjets, n_mjj_skim], "h_cutflow", "Cutflow; Cut; Events")
     h_cutflow_weighted = build_cutflow_histogram(
         cutflow_labels,
-        [n_total_weighted, n_lumi_weighted, n_met_weighted, n_one_fatjet_weighted, n_two_valid_fatjets_weighted],
+        [n_total_weighted, n_lumi_weighted, n_met_weighted, n_one_fatjet_weighted, n_two_valid_fatjets_weighted, n_mjj_skim_weighted],
         "h_cutflow_weighted",
         "Weighted cutflow; Cut; Weighted events",
     )

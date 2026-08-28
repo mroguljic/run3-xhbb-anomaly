@@ -33,8 +33,8 @@ xsecs = {
 }
 
 int_lumi = {
-    # brilcalc lumi --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /fb -i <golde_json>
-    "2024": 109987.998903 
+    "2024": 109987.998903,
+    "2025": 110590.0,
 }
 
 def get_xsec(process: str) -> float:

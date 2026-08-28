@@ -489,7 +489,7 @@ def fill_templates_and_diagnostics(input_file_path: str, output_file_path: str, 
     # measurement, and the JES/JER-variation branch -- without re-registering the correction
     # separately on each one.
     if not data_flag:
-        pileup_file = corrections_paths.corrections[year]["Pileup"]
+        pileup_file = corrections_paths.get_correction_path(year, "Pileup")
         cset_pileup = core.CorrectionSet.from_file(pileup_file)
         collisions  = list(cset_pileup); assert(len(collisions) == 1); collisions = collisions[0] # Should only ever be one key (collision goldenJSON)
         pu = Correction("PileUp_Corr", "TIMBER/Framework/src/PileUp_correctionlib_weight.cc", [pileup_file, collisions, analyzer.isData], corrtype="weight")
