@@ -154,6 +154,12 @@ def event_preselection(options: OptionParser) -> None:
         "valid_fatjet_indices[0] == h_cand_idx ? valid_fatjet_indices[1] : valid_fatjet_indices[0]",
     )
 
+    # Constituents of the Y candidatefor Lund plane reweighting
+    analyzer.Define("sel_pfcand_link", "FatJetPFCand_jetIdx == y_cand_idx")
+    analyzer.Define("sel_pfcand_idx", "FatJetPFCand_pfCandIdx[sel_pfcand_link]")
+    for pfcand_variable in ["pt", "eta", "phi", "mass", "pdgId"]:
+        analyzer.Define(f"y_cand_pfcand_{pfcand_variable}", f"ROOT::VecOps::Take(PFCand_{pfcand_variable}, sel_pfcand_idx)")
+
     analyzer.Define("h_cand_reg_mass", "FatJet_regressed_mass[h_cand_idx]")
     analyzer.Define("y_cand_reg_mass", "FatJet_regressed_mass[y_cand_idx]")
     analyzer.Define("h_cand_kin_mass", "FatJet_mass_nom[h_cand_idx]")

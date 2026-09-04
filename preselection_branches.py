@@ -6,11 +6,10 @@ COMMON_SNAPSHOT_COLUMNS: list[str] = [
     "luminosityBlock",
     "event",
     "genWeight",
-    "nFatJet",
+    "nFatJet$", # wihout $ it would also drag in nFatJetPFCand
     "valid_fatjet_indices",
     "m_jj*",
     "n_valid_fatjets",
-    "nFatJet",
     "FatJet_eta",
     "FatJet_phi",
     "FatJet_globalParT3_QCD",
