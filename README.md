@@ -140,3 +140,18 @@ Output per signal, under `tagger_studies/scans/<signal>/`:
 
 `tagger_studies/scans/summary.csv` collects the best WP/window/significance
 across all scanned signals.
+
+
+## 6. [WIP] Lund plane reweighting (`lund/`)
+
+Calibrates the Y anti-QCD selection for arbitrary Y decays, on top of a skim
+(which carries the Y candidate's PF candidates and gen-level prongs). To be
+executed standalone and SFs measured. Work in progress.
+
+```bash
+git clone https://github.com/OzAmram/LundReweighting.git 
+anomaly_exec lund/apply_weights.py -i output_presel_signal.root -y 2024 -o lund/output/sf.json
+```
+
+Note that no Run 3 Lund plane ratio exists yet, so this currently runs against the
+Run 2 (2018) measurement.

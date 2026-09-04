@@ -73,6 +73,47 @@ def build_cutflow_histogram(labels: list[str], counts: list[Union[int, float]], 
     return histogram
 
 
+def define_lund_gen_parts(analyzer: Analyzer) -> None:
+    """Define the hard-process decay tree that seeds the Lund plane prongs (MC only).
+
+    Selection: outgoing hard-process particles (includes quarks), plus the last copies of 
+    hard-process pdgId>5 (no quarks except tops). Decay products (quarks) point 
+    at the last copy of their parent, which is not always flagged with isHardProcess, 
+    The purpose of second condition is to keep that last copy (mother of quarks)
+
+    Args:
+        analyzer (Analyzer): TIMBER analyzer, MC only (crashes on data, no GenPart).
+    """
+    analyzer.Define(
+        "sel_gen_mask",
+        "((GenPart_statusFlags & (1 << 7)) != 0 && GenPart_status != 21)" # isHardProcess minus beam OR
+        " || ((GenPart_statusFlags & (1 << 8)) != 0 && (GenPart_statusFlags & (1 << 13)) != 0" 
+        " && abs(GenPart_pdgId) > 5 && GenPart_pdgId != 21)", # Last copy of **fromHardProcess** with pdgId>5
+    )
+    analyzer.Define(
+        "lund_gen_idx",
+        "ROOT::VecOps::RVec<int> indices;"
+        " for (size_t i = 0; i < sel_gen_mask.size(); ++i) if (sel_gen_mask[i]) indices.push_back((int)i);"
+        " return indices;",
+    )
+    analyzer.Define(
+        "lund_gen_mothIdx",
+        "ROOT::VecOps::RVec<int> mothers;"
+        " for (auto mother_idx : GenPart_genPartIdxMother[sel_gen_mask]) mothers.push_back((int)mother_idx);"
+        " return mothers;",
+    )
+    # Never found mothIdx=-1 in testing, but still guarding against it
+    analyzer.Define(
+        "lund_gen_mothPdgId",
+        "ROOT::VecOps::RVec<int> mother_ids;"
+        " for (auto mother_idx : lund_gen_mothIdx)"
+        " mother_ids.push_back(mother_idx >= 0 ? GenPart_pdgId[mother_idx] : 0);"
+        " return mother_ids;",
+    )
+    for gen_variable in ["pt", "eta", "phi", "pdgId"]:
+        analyzer.Define(f"lund_gen_{gen_variable}", f"GenPart_{gen_variable}[sel_gen_mask]")
+
+
 def event_preselection(options: OptionParser) -> None:
     """
     Perform event selection
@@ -159,6 +200,9 @@ def event_preselection(options: OptionParser) -> None:
     analyzer.Define("sel_pfcand_idx", "FatJetPFCand_pfCandIdx[sel_pfcand_link]")
     for pfcand_variable in ["pt", "eta", "phi", "mass", "pdgId"]:
         analyzer.Define(f"y_cand_pfcand_{pfcand_variable}", f"ROOT::VecOps::Take(PFCand_{pfcand_variable}, sel_pfcand_idx)")
+
+    if not data_flag:
+        define_lund_gen_parts(analyzer)
 
     analyzer.Define("h_cand_reg_mass", "FatJet_regressed_mass[h_cand_idx]")
     analyzer.Define("y_cand_reg_mass", "FatJet_regressed_mass[y_cand_idx]")

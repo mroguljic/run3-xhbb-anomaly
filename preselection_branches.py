@@ -22,6 +22,7 @@ COMMON_SNAPSHOT_COLUMNS: list[str] = [
     "FatJet_pt",
     "h_cand*",
     "y_cand*",
+    "lund_gen_*",  # For Lund-reweighting
     "HLT_AK8DiPFJet250_250_SoftDropMass40",
     "HLT_AK8PFJet250_SoftDropMass40_PNetBB0p06",
     "HLT_AK8DiPFJet250_250_MassSD30",
