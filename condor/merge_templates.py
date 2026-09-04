@@ -7,7 +7,7 @@ Reads a template manifest and produces one merged template ROOT file per process
   - If a process has multiple valid chunk files, merge them with hadd.
 
 Output destination is derived from condor config:
-  OUTPUT["templates_dir"]/<process>/<merged_filename>
+  get_templates_dir(<year>)/<process>/<merged_filename>
 
 Examples:
     python3 merge_templates.py --manifest template_manifest_2024.json
@@ -33,7 +33,7 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.check_template_outputs import stat_eos_file, store_path_from_eos_url
-from condor.config import LOCAL_MERGED_TEMPLATES_DIR, OUTPUT, get_store_eos_path, get_xrdfs_mkdir_command
+from condor.config import get_local_merged_templates_dir, get_templates_dir, get_store_eos_path, get_xrdfs_mkdir_command
 from filelists.xsecs import get_int_lumi, get_xsec
 import ROOT
 
@@ -214,9 +214,9 @@ def scale_merged_mc_template(template_file_path: str, process: str, year: str) -
     return scale_factor
 
 
-def get_local_output_path(process: str, output_name_template: str) -> str:
+def get_local_output_path(process: str, output_name_template: str, year: str) -> str:
     """Return the local merged template destination for a process or group."""
-    return str(Path(LOCAL_MERGED_TEMPLATES_DIR) / output_name_template.format(process=process))
+    return str(Path(get_local_merged_templates_dir(year)) / output_name_template.format(process=process))
 
 
 def copy_output_to_local(output_eos_path: str, local_output_path: str) -> None:
@@ -296,16 +296,16 @@ def merge_single_process(
     process: str,
     inputs: List[str],
     output_name_template: str,
-    year: Optional[str] = None,
+    year: str,
     apply_scale: bool = False,
     copy_local: bool = True,
     dry_run: bool = False,
     overwrite: bool = False,
 ) -> ProcessMergeResult:
     """Merge or copy template chunks for one process."""
-    output_store_path = f"{OUTPUT['templates_dir']}/{process}/{output_name_template.format(process=process)}"
+    output_store_path = f"{get_templates_dir(year)}/{process}/{output_name_template.format(process=process)}"
     output_eos_path = get_store_eos_path(output_store_path)
-    local_output_path = get_local_output_path(process, output_name_template) if copy_local else None
+    local_output_path = get_local_output_path(process, output_name_template, year) if copy_local else None
 
     result = ProcessMergeResult(
         process=process,
@@ -360,8 +360,6 @@ def merge_single_process(
                 run_hadd(local_output, result.valid_inputs)
 
             if apply_scale:
-                if year is None:
-                    raise RuntimeError("Year is required when scaling MC templates")
                 result.scale_factor = scale_merged_mc_template(local_output, process, year)
 
             run_xrdcp(local_output, output_eos_path)
@@ -392,7 +390,16 @@ def merge_all_processes(
     """Merge template chunks for all (or selected) processes and optional groups."""
     grouped_inputs = build_process_inputs(manifest)
     manifest_path = manifest.get("_source_path", "unknown")
-    year = str(manifest.get("year", "unknown"))
+    # year is load-bearing: it namespaces the merged output paths and selects the
+    # integrated luminosity used for MC scaling.
+    year = manifest.get("year")
+    if not year:
+        raise ValueError(
+            f"Template manifest '{manifest_path}' has no 'year' field; it is required "
+            "because merged output paths are namespaced by year and MC scaling uses "
+            "the per-year integrated luminosity."
+        )
+    year = str(year)
     summary = MergeSummary(manifest_path=manifest_path)
     merged_process_outputs: Dict[str, List[str]] = {}
 

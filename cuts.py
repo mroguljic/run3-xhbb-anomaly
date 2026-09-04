@@ -61,6 +61,21 @@ for config in [PRESELECTION_CUTS, REGION_CUTS, TEMPLATE_SELECTION, TEMPLATE_TAGG
     config["2025"] = copy.deepcopy(config["2024"])
 
 
+# 2024 and 2025 share the same Summer24 MC (there is no 2025 MC), so it is split 1:1 by
+# event number to keep the two years' MC statistically disjoint - otherwise the per-year
+# MC-stat (Barlow-Beeston) nuisances would double-count the same simulated events.
+# The 1:1 ratio is justified by the nearly equal integrated luminosities
+# (2024: 109.99/fb, 2025: 110.59/fb, see filelists/xsecs.py).
+#
+# Ranges are half-open [lo, hi) on (event % MC_YEAR_SPLIT_MODULUS); they must be disjoint
+# and together cover the full modulus, otherwise MC events are dropped or double-counted.
+MC_YEAR_SPLIT_MODULUS = 100
+MC_YEAR_SPLIT = {
+    "2024": (0, 50),
+    "2025": (50, 100),
+}
+
+
 TEMPLATE_REGION_BOUNDARIES = {
     year: {
         "Pass":    (wps["h_xbb_wp"], None),

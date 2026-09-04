@@ -39,7 +39,7 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, OUTPUT, get_store_eos_path
+from condor.config import BATCH_TARGET_EVENTS, CAMPAIGN, BASE_STORE_PATH, YEARS_TO_PROCESS, get_skims_dir, get_store_eos_path
 from filelists.Nano_v15 import mc_bkg, mc_sig, jetmet, muon
 from filelists.dataset_utils import DASGOCLIENT_PATH
 
@@ -173,7 +173,7 @@ Examples:
     parser.add_argument(
         "--year",
         required=True,
-        choices=["2022", "2023", "2024"],
+        choices=YEARS_TO_PROCESS,
         help="Data year"
     )
     parser.add_argument(
@@ -323,7 +323,7 @@ Examples:
             
             for batch in batches:
                 batch_id = batch["batch_id"]
-                output_path = f"{OUTPUT['skims_dir']}/{dataset_name}/preselection_{batch_id}.root"
+                output_path = f"{get_skims_dir(year)}/{dataset_name}/preselection_{batch_id}.root"
                 eos_output = get_store_eos_path(output_path)
                 
                 manifest["datasets"][dataset_name]["batches"][batch_id] = {

@@ -3,9 +3,9 @@
 CLI for plotting template histograms.
 
 Examples:
-    python3 plotting/cli.py --year 2024 --input-dir output/templates/merged
-    python3 plotting/cli.py --year 2024 --input-dir output/templates/merged --output-dir output/plots/2024
-    python3 plotting/cli.py --year 2024 --input-dir output/templates/merged --processes QCD TT data
+    python3 plotting/cli.py --year 2024
+    python3 plotting/cli.py --year 2024 --output-dir output/plots/2024
+    python3 plotting/cli.py --year 2024 --processes QCD TT data
 """
 
 import argparse
@@ -27,9 +27,9 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 plotting/cli.py --year 2024 --input-dir output/templates/merged
-  python3 plotting/cli.py --year 2024 --input-dir output/templates/merged --output-dir custom/plots
-  python3 plotting/cli.py --year 2024 --input-dir output/templates/merged --processes QCD TT data
+  python3 plotting/cli.py --year 2024
+  python3 plotting/cli.py --year 2024 --output-dir custom/plots
+  python3 plotting/cli.py --year 2024 --processes QCD TT data
         """,
     )
     parser.add_argument(
@@ -40,8 +40,9 @@ Examples:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=DEFAULT_TEMPLATE_INPUT_DIR,
-        help=f"Directory containing merged template ROOT files (default: {DEFAULT_TEMPLATE_INPUT_DIR})",
+        default=None,
+        help=f"Directory containing merged template ROOT files "
+             f"(default: {DEFAULT_TEMPLATE_INPUT_DIR}/<year>)",
     )
     parser.add_argument(
         "--output-dir",
@@ -113,6 +114,11 @@ def discover_template_files(
 def main() -> int:
     """CLI entrypoint."""
     args = parse_args()
+
+    # Merged templates are namespaced by year (2024 and 2025 share the same MC, so
+    # the per-process filenames collide), so the default input dir depends on --year.
+    if args.input_dir is None:
+        args.input_dir = DEFAULT_TEMPLATE_INPUT_DIR / args.year
 
     print("=" * 80)
     print("Template Histogram Plotter")

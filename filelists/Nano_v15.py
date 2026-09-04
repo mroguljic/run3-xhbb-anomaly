@@ -1,3 +1,5 @@
+import copy
+
 # 2025 MC: the Summer24 MC below is shared with 2025, split 1:1 by event number
 mc_bkg = {
     "2022": {
@@ -92,6 +94,13 @@ mc_sig = {
         }
     }
 }
+
+# There is no dedicated 2025 MC. 2025 reuses the exact same Summer24 datasets as 2024;
+# preselection.py splits them 1:1 by event number (cuts.MC_YEAR_SPLIT), so the two years
+# get statistically disjoint halves of each sample. Aliasing rather than duplicating the
+# DAS paths keeps the two years from silently drifting apart.
+mc_bkg["2025"] = copy.deepcopy(mc_bkg["2024"])
+mc_sig["2025"] = copy.deepcopy(mc_sig["2024"])
 
 muon = {
     "2024": {

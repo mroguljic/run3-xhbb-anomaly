@@ -18,11 +18,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from condor.config import LOCAL_MERGED_TEMPLATES_DIR
+from condor.config import DEFAULT_YEAR, get_local_merged_templates_dir
 from tagger_studies import config
 from tagger_studies.thn_utils import ANTIQCD_AXIS, MJJ_AXIS, MJY_AXIS, XBB_AXIS, open_thn
 
-DEFAULT_MERGED_DIR = Path(LOCAL_MERGED_TEMPLATES_DIR)
+DEFAULT_MERGED_DIR = Path(get_local_merged_templates_dir(DEFAULT_YEAR))
 
 
 def region_yield(

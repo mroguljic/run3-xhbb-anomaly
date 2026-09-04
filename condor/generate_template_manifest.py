@@ -53,7 +53,7 @@ from typing import Dict, List
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.check_skim_outputs import SkimCheckResult, check_all_skims
-from condor.config import OUTPUT, TEMPLATE_BATCH_SIZE, CAMPAIGN, get_store_eos_path
+from condor.config import TEMPLATE_BATCH_SIZE, CAMPAIGN, get_templates_dir, get_store_eos_path
 
 
 # ============================================================================
@@ -125,7 +125,14 @@ def build_template_manifest(
     Returns:
         Template manifest dict ready to be written as JSON.
     """
-    year = skim_manifest.get("year", "unknown")
+    # year is load-bearing: it namespaces the template output paths, so a missing
+    # value would silently write 2024 and 2025 into the same directory.
+    year = skim_manifest.get("year")
+    if not year:
+        raise ValueError(
+            f"Skim manifest '{skim_manifest_path}' has no 'year' field; it is required "
+            "because template output paths are namespaced by year."
+        )
     campaign = skim_manifest.get("campaign", CAMPAIGN)
 
     template_manifest: dict = {
@@ -177,7 +184,7 @@ def build_template_manifest(
         for chunk_index, chunk in enumerate(chunks):
             chunk_id = f"{dataset_key}_tpl_chunk_{chunk_index}"
             total_size_gb = sum(r.size_gb for r in chunk)
-            output_store_path = f"{OUTPUT['templates_dir']}/{dataset_name}/templates_{chunk_id}.root"
+            output_store_path = f"{get_templates_dir(year)}/{dataset_name}/templates_{chunk_id}.root"
             eos_output = get_store_eos_path(output_store_path)
 
             batches[chunk_id] = {

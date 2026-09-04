@@ -9,14 +9,28 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
-CAMPAIGN = "20260722"
+CAMPAIGN = "20260904"
 BASE_STORE_PATH = f"/store/group/lpchbbrun3/{os.environ.get('USER')}/run3-xhbb-anomaly"
 
-OUTPUT = {
-    "skims_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/skims",
-    "templates_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/templates",
-    "logs_dir": f"{BASE_STORE_PATH}/{CAMPAIGN}/logs",
-}
+# Output paths are namespaced by year. This matters because the MC dataset keys are
+# identical across years (2024 and 2025 share the same Summer24 samples, split 1:1 by
+# event number in preselection.py), so a year-less path would have the two years'
+# skims/templates overwrite each other.
+
+
+def get_skims_dir(year: str) -> str:
+    """Return the EOS store directory holding stage-1 skims for a year."""
+    return f"{BASE_STORE_PATH}/{CAMPAIGN}/{year}/skims"
+
+
+def get_templates_dir(year: str) -> str:
+    """Return the EOS store directory holding stage-2 templates for a year."""
+    return f"{BASE_STORE_PATH}/{CAMPAIGN}/{year}/templates"
+
+
+def get_logs_dir(year: str) -> str:
+    """Return the EOS store directory holding job logs for a year."""
+    return f"{BASE_STORE_PATH}/{CAMPAIGN}/{year}/logs"
 
 # ============================================================================
 # Controller Defaults
@@ -29,7 +43,15 @@ AUTO_SUBMIT = False
 AUTO_RESUBMIT_MISSING = False
 
 MERGED_TEMPLATE_FILENAME = "templates_{process}.root"
-LOCAL_MERGED_TEMPLATES_DIR = str(REPO_ROOT / "condor" / "output" / "templates" / "merged")
+
+# Base of the local merged-template tree; the actual files live in a per-year
+# subdirectory (see get_local_merged_templates_dir).
+LOCAL_MERGED_TEMPLATES_BASE_DIR = str(REPO_ROOT / "condor" / "output" / "templates" / "merged")
+
+
+def get_local_merged_templates_dir(year: str) -> str:
+    """Return the local directory merged templates for a year are copied into."""
+    return str(Path(LOCAL_MERGED_TEMPLATES_BASE_DIR) / year)
 
 # ============================================================================
 # EOS Filesystem Operations

@@ -43,7 +43,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from condor.config import LOCAL_MERGED_TEMPLATES_DIR
+from condor.config import DEFAULT_YEAR, get_local_merged_templates_dir
 from plotting.config import CMS_COLORS, PROCESSES as PLOT_PROCESSES
 from tagger_studies import config
 from tagger_studies.thn_utils import MJJ_AXIS, MJY_AXIS, open_thn, project_1d, suffix_sum_2d, window_yield_grid
@@ -51,7 +51,7 @@ from tagger_studies.window_finder import find_signal_window
 
 SIGNAL_NAME_RE = re.compile(r"templates_(MX(\d+)_MY(\d+))\.root")
 
-DEFAULT_MERGED_DIR = Path(LOCAL_MERGED_TEMPLATES_DIR)
+DEFAULT_MERGED_DIR = Path(get_local_merged_templates_dir(DEFAULT_YEAR))
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "scans"
 
 # Sequential blue ramp, light->dark (tagger_studies/../dataviz skill palette).

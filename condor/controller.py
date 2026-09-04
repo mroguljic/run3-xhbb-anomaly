@@ -38,7 +38,7 @@ from condor.config import (
     AUTO_SUBMIT,
     CAMPAIGN,
     DEFAULT_YEAR,
-    LOCAL_MERGED_TEMPLATES_DIR,
+    get_local_merged_templates_dir,
     MERGED_TEMPLATE_FILENAME,
     YEARS_TO_PROCESS,
 )
@@ -595,6 +595,7 @@ def run_merge_stage(
     template_manifest_path: Path,
     merge_report_path: Path,
     condor_dir: Path,
+    year: str,
     dry_run: bool,
     skip_local_copy: bool = False,
 ) -> StageOutcome:
@@ -632,9 +633,10 @@ def run_merge_stage(
         return StageOutcome(name=stage_name, ok=False, details={**details, "error": "Merge failed"})
 
     if not skip_local_copy and not dry_run:
-        print(f"  Copying merged templates to local: {LOCAL_MERGED_TEMPLATES_DIR}")
+        local_merged_dir = get_local_merged_templates_dir(year)
+        print(f"  Copying merged templates to local: {local_merged_dir}")
         try:
-            local_dir = Path(LOCAL_MERGED_TEMPLATES_DIR)
+            local_dir = Path(local_merged_dir)
             local_dir.mkdir(parents=True, exist_ok=True)
             details["local_copy_dir"] = str(local_dir.resolve())
         except OSError as exc:
@@ -867,6 +869,7 @@ def main() -> int:
                     template_manifest_path=paths.template_manifest,
                     merge_report_path=paths.merge_report,
                     condor_dir=condor_dir,
+                    year=args.year,
                     dry_run=args.dry_run,
                     skip_local_copy=args.dry_run,
                 )

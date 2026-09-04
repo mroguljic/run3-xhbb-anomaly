@@ -29,7 +29,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import cuts
-from condor.config import LOCAL_MERGED_TEMPLATES_DIR
+from condor.config import DEFAULT_YEAR, get_local_merged_templates_dir
 from plotting.config import PROCESSES
 from plotting.utils import read_histogram_from_root
 
@@ -46,7 +46,7 @@ TAGGERS = {
     },
 }
 
-DEFAULT_INPUT_DIR = Path(LOCAL_MERGED_TEMPLATES_DIR)
+DEFAULT_INPUT_DIR = Path(get_local_merged_templates_dir(DEFAULT_YEAR))
 
 
 def efficiency_curve(bin_contents: np.ndarray, bin_edges: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

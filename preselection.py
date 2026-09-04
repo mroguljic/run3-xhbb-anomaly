@@ -42,6 +42,42 @@ def detect_era(input_path: str) -> str:
     return input_path[era_index]
 
 
+def apply_mc_year_split(analyzer: Analyzer, year: str, data_flag: bool) -> None:
+    """
+    Split the shared Summer24 MC between the analysis years by event number.
+
+    2024 and 2025 use the same MC sample, so each year takes a disjoint slice of it
+    (cuts.MC_YEAR_SPLIT) to keep the per-year MC statistics independent. This is a
+    no-op for data, where the years are physically distinct datasets.
+
+    Must be applied before the cutflow counting starts, so that bin 1 of
+    h_cutflow_weighted is the sum of genWeight over *this year's slice only*. That
+    bin is what condor/merge_templates.py divides by when applying the
+    xsec * int_lumi / sum(genWeight) normalisation, so the split propagates into the
+    scaling automatically with no further bookkeeping.
+
+    Args:
+        analyzer (Analyzer): The Analyzer instance.
+        year (str): Data-taking year (e.g. "2024").
+        data_flag (bool): Whether the input is data.
+    """
+    if data_flag:
+        return
+
+    if year not in cuts.MC_YEAR_SPLIT:
+        raise ValueError(
+            f"No MC year split configured for '{year}'. Available years: {sorted(cuts.MC_YEAR_SPLIT)}"
+        )
+
+    lo, hi = cuts.MC_YEAR_SPLIT[year]
+    modulus = cuts.MC_YEAR_SPLIT_MODULUS
+    print(f"Applying {year} MC year split: (event % {modulus}) in [{lo}, {hi})")
+    analyzer.Cut(
+        "mc_year_split",
+        f"(event % {modulus}) >= {lo} && (event % {modulus}) < {hi}",
+    )
+
+
 def apply_data_lumi_mask(analyzer: Analyzer, year: str, data_flag: bool) -> None:
     """
     Apply the golden JSON lumi mask for data using TIMBER's LumiFilter.
@@ -133,6 +169,8 @@ def event_preselection(options: OptionParser) -> None:
     preselection_cuts = cuts.PRESELECTION_CUTS[year]
     print("Compiling JetSelection.cc")
     Common.CompileCpp("TIMBER_modules/JetSelection.cc")  # also loads libtimber.so
+
+    apply_mc_year_split(analyzer, year, data_flag)
 
     n_total = get_n_events(analyzer)
     n_total_weighted = get_n_weighted(analyzer, data_flag)

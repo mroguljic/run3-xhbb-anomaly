@@ -76,7 +76,9 @@ condor_submit template_submission_2024.sub
 ```
 
 Merged, cross-section-scaled templates land in
-`condor/output/templates/merged/templates_<process>.root`.
+`condor/output/templates/merged/<year>/templates_<process>.root`.
+The per-year subdirectory matters because 2024 and 2025 share the same Summer24 MC
+(split 1:1 by event number, see `cuts.MC_YEAR_SPLIT`), so the dataset keys collide.
 
 ## 4. Plotting (`plotting/`)
 
@@ -86,17 +88,17 @@ comparison plots for the histograms configured in `plotting/config.py`'s
 `m_jj`/`m_jY`, with the Signal-region ones blinded).
 
 ```bash
-anomaly_exec plotting/cli.py --year 2024 --input-dir condor/output/templates/merged
+anomaly_exec plotting/cli.py --year 2024
 ```
 
 Useful variants:
 
 ```bash
 # custom output location (default: output/plots)
-anomaly_exec plotting/cli.py --year 2024 --input-dir condor/output/templates/merged --output-dir output/plots/2024
+anomaly_exec plotting/cli.py --year 2024 --output-dir output/plots/2024
 
 # only specific processes
-anomaly_exec plotting/cli.py --year 2024 --input-dir condor/output/templates/merged --processes QCD TT data
+anomaly_exec plotting/cli.py --year 2024 --processes QCD TT data
 ```
 
 ## 5. Tagger studies (`tagger_studies/`)
@@ -126,7 +128,7 @@ anomaly_exec tagger_studies/significance_scan.py
 anomaly_exec tagger_studies/significance_scan.py --signals MX1800_MY100 MX3000_MY300
 
 # ROC curves for both taggers from the merged templates
-anomaly_exec tagger_studies/roc.py --input-dir condor/output/templates/merged --output-dir tagger_studies/roc
+anomaly_exec tagger_studies/roc.py --input-dir condor/output/templates/merged/2024 --output-dir tagger_studies/roc
 ```
 
 Output per signal, under `tagger_studies/scans/<signal>/`:
