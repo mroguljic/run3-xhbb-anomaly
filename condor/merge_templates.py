@@ -390,8 +390,6 @@ def merge_all_processes(
     """Merge template chunks for all (or selected) processes and optional groups."""
     grouped_inputs = build_process_inputs(manifest)
     manifest_path = manifest.get("_source_path", "unknown")
-    # year is load-bearing: it namespaces the merged output paths and selects the
-    # integrated luminosity used for MC scaling.
     year = manifest.get("year")
     if not year:
         raise ValueError(

@@ -47,8 +47,7 @@ def apply_mc_year_split(analyzer: Analyzer, year: str, data_flag: bool) -> None:
     Split the shared Summer24 MC between the analysis years by event number.
 
     2024 and 2025 use the same MC sample, so each year takes a disjoint slice of it
-    (cuts.MC_YEAR_SPLIT) to keep the per-year MC statistics independent. This is a
-    no-op for data, where the years are physically distinct datasets.
+    (cuts.MC_YEAR_SPLIT) to keep the per-year MC statistics independent.
 
     Must be applied before the cutflow counting starts, so that bin 1 of
     h_cutflow_weighted is the sum of genWeight over *this year's slice only*. That
