@@ -225,9 +225,15 @@ Examples:
     print(f"Output:         {output_path}")
     print("=" * 80 + "\n")
     
-    # Determine stage and create logs directory if it doesn't exist
-    log_subdir = detect_job_stage(manifest)
-    logs_dir = Path("logs") / log_subdir
+    # Determine stage and create logs directory if it doesn't exist.
+    # Logs are namespaced by year as well as stage: condor names each log file after
+    # its BATCH_ID, and MC batch IDs are identical across years (2024 and 2025 share
+    # the same Summer24 samples, split 1:1 by event number). Without the year in the
+    # path, whichever year is submitted second overwrites the other's MC job logs.
+    stage = detect_job_stage(manifest)
+    year = str(manifest["year"])
+    log_subdir = f"{stage}/{year}"
+    logs_dir = Path("logs") / stage / year
     if not logs_dir.exists():
         logs_dir.mkdir(parents=True, exist_ok=True)
         print(f"Created logs directory: {logs_dir}/\n")
@@ -254,7 +260,7 @@ Examples:
                     print(f"  Warning: Failed to create {output_dir}")
     
     print()
-    wrapper_script = "template_wrapper.sh" if log_subdir == "templates" else "condor_wrapper.sh"
+    wrapper_script = "template_wrapper.sh" if stage == "templates" else "condor_wrapper.sh"
 
     sub_content, queued_batches, skipped_batches = generate_submission(
         manifest,
