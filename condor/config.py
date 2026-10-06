@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
-CAMPAIGN = "20260904"
+CAMPAIGN = "20261006"
 
 # Jobs do not run the local checkout: the wrappers git clone GIT_REPO_URL at GIT_REF
 # (branch or tag) inside the job. Set GIT_REF on a side branch to that branch's name,
