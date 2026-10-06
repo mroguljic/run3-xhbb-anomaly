@@ -36,8 +36,11 @@ voms-proxy-info
 # Clone repository
 # ============================================================================
 
-echo "Cloning repository..."
-git clone --quiet https://gitlab.cern.ch/mrogulji/run3-xhbb-anomaly
+# GIT_REPO_URL / GIT_REF come from the .sub file's environment line (condor/config.py)
+GIT_REPO_URL="${GIT_REPO_URL:-https://gitlab.cern.ch/mrogulji/run3-xhbb-anomaly}"
+GIT_REF="${GIT_REF:-master}"
+echo "Cloning repository ${GIT_REPO_URL} at ${GIT_REF}..."
+git clone --quiet --branch "${GIT_REF}" "${GIT_REPO_URL}" "${REPO_DIR}"
 if [[ ! -d "${REPO_DIR}" ]]; then
     echo "ERROR: Failed to clone repository"
     exit 1

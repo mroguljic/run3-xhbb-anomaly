@@ -23,7 +23,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from condor.check_skim_outputs import stat_eos_file
-from condor.config import CAMPAIGN, get_xrdfs_mkdir_command
+from condor.config import CAMPAIGN, GIT_REF, GIT_REPO_URL, get_xrdfs_mkdir_command
 
 
 # ============================================================================
@@ -34,6 +34,7 @@ SUB_TEMPLATE = """\
 # HTCondor Submission File - Generated {generated_at}
 # Campaign: {campaign}
 # Manifest: {manifest_file}
+# Code: {git_repo_url} @ {git_ref}
 
 universe = vanilla
 executable = {wrapper_script}
@@ -43,6 +44,9 @@ when_to_transfer_output = ON_EXIT
 transfer_input_files = {manifest_file}
 
 +SingularityImage = "/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/jhu-tools/timber:run3/"
+
+# The wrapper clones the analysis code at this ref (condor/config.py)
+environment = "GIT_REPO_URL={git_repo_url} GIT_REF={git_ref}"
 
 output   = logs/{log_subdir}/$(BATCH_ID).out
 error    = logs/{log_subdir}/$(BATCH_ID).err
@@ -166,10 +170,46 @@ def generate_submission(manifest_dict: dict, manifest_file: str, test: bool, log
         manifest_file=manifest_file,
         log_subdir=log_subdir,
         wrapper_script=wrapper_script,
+        git_repo_url=GIT_REPO_URL,
+        git_ref=GIT_REF,
         queue_entries=queue_entries
     )
     
     return sub_content, queued_batches, skipped_batches
+
+
+def check_git_ref_pushed(repo_url: str, ref: str) -> None:
+    """Warn if the ref the jobs will clone is missing on the remote or differs locally.
+
+    Jobs run the remote ref, not the local checkout, so unpushed commits would be
+    silently ignored. Only warns: the check needs network access and a local git repo.
+    """
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parent.parent
+
+    def git(*args):
+        result = subprocess.run(["git", *args], capture_output=True, text=True, timeout=60)
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    try:
+        remote = git("ls-remote", repo_url, f"refs/heads/{ref}", f"refs/tags/{ref}")
+        local = git("-C", str(repo_root), "rev-parse", f"{ref}^{{commit}}")
+        head = git("-C", str(repo_root), "rev-parse", "HEAD")
+    except (subprocess.SubprocessError, OSError) as e:
+        print(f"WARNING: Could not check that '{ref}' is pushed to {repo_url}: {e}\n")
+        return
+
+    if remote is None:
+        print(f"WARNING: Could not reach {repo_url} to check that '{ref}' is pushed.\n")
+    elif not remote:
+        print(f"WARNING: '{ref}' does not exist on {repo_url} - every job will fail to clone. Push it first.\n")
+    elif local and local not in remote.split():
+        print(f"WARNING: Local '{ref}' ({local[:8]}) differs from {repo_url} ({remote.split()[0][:8]}). "
+              f"Jobs will run the remote version. Push (or pull) first.\n")
+    if local and head and head != local:
+        print(f"WARNING: The local checkout (HEAD {head[:8]}) is not '{ref}' ({local[:8]}). "
+              f"Jobs run '{ref}' (GIT_REF in condor/config.py), not what is checked out here.\n")
 
 
 # ============================================================================
@@ -223,7 +263,10 @@ Examples:
     print(f"Year:           {manifest['year']}")
     print(f"Total datasets: {len(manifest['datasets'])}")
     print(f"Output:         {output_path}")
+    print(f"Code:           {GIT_REPO_URL} @ {GIT_REF}")
     print("=" * 80 + "\n")
+
+    check_git_ref_pushed(GIT_REPO_URL, GIT_REF)
     
     # Determine stage and create logs directory if it doesn't exist.
     # Logs are namespaced by year as well as stage: condor names each log file after

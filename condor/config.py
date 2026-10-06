@@ -10,6 +10,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BATCH_TARGET_EVENTS = 2000000 # Number of input events per skimming batch
 TEMPLATE_BATCH_SIZE = 3. # GB of input skims per template batch (for template generation)
 CAMPAIGN = "20260904"
+
+# Jobs do not run the local checkout: the wrappers git clone GIT_REPO_URL at GIT_REF
+# (branch or tag) inside the job. Set GIT_REF on a side branch to that branch's name,
+# and push it before submitting - generate_submission.py warns if the remote ref is
+# missing or differs from the local one.
+GIT_REPO_URL = "https://gitlab.cern.ch/mrogulji/run3-xhbb-anomaly"
+GIT_REF = "master"
 BASE_STORE_PATH = f"/store/group/lpchbbrun3/{os.environ.get('USER')}/run3-xhbb-anomaly"
 
 # Output paths are namespaced by year. This matters because the MC dataset keys are
