@@ -194,6 +194,9 @@ def event_preselection(options: OptionParser) -> None:
     AutoJME.AutoJME(analyzer, ["Jet", "FatJet"], jec_paths=[corrections_paths.get_correction_path(year, "JEC_AK4"), corrections_paths.get_correction_path(year, "JEC_AK8")], dataEra=era, verbose=False)
     AutoJME.AutoJME_mSD(analyzer, jec_path=corrections_paths.get_correction_path(year, "JEC_AK4"), dataEra=era, verbose=False)
     AutoJetVetoMap.AutoJetVetoMap(analyzer, map_path=jetveto_file, pt_branch="Jet_pt_nom", id_branch="Jet_jetId")
+    # Required in Run 3 (JME): drop the event if any loose AK4 jet (pT > 15, tight ID,
+    # EM fraction < 0.9) lies in a vetoed region. Same map for data and MC.
+    analyzer.Cut("jet_veto_map", "jetmap_vetoed_events == 0")
 
     # We use JES__up in MC because it has the highest pT for the fatjets and thus gives a conservative selection of valid fatjets that will pass the pT cut under any JEC variation. Assumes that the ordering of fatjets by pT does not change under JEC variations, which is reasonable.
     if data_flag:
@@ -205,15 +208,31 @@ def event_preselection(options: OptionParser) -> None:
         mass_branch_for_selection = "FatJet_msoftdrop_JES__up"  
         jec_variations = ["nom", "JES__up", "JES__down", "JER__up", "JER__down"]
 
-    analyzer.Define(
-        "valid_fatjet_indices",
-        "SelectJets({0}, FatJet_eta, {1}, {2}, {3}, {4})".format(
+    def select_jets_expression(jet_id_min):
+        return "SelectJets({0}, FatJet_eta, {1}, FatJet_jetId, {2}, {3}, {4}, {5})".format(
             pt_branch_for_selection,
             mass_branch_for_selection,
             preselection_cuts["valid_fatjet_pt_min"],
             preselection_cuts["valid_fatjet_abs_eta_max"],
             preselection_cuts["valid_fatjet_mass_min"],
-        ),
+            jet_id_min,
+        )
+
+    # Book the jet-veto count and the "two valid fatjets before jet ID" count together,
+    # so they cost one event loop. The latter is cutflow information only.
+    no_id_frame = analyzer.DataFrame.Filter(f"{select_jets_expression(0)}.size() >= 2")
+    counts = [analyzer.DataFrame.Count(), no_id_frame.Count()]
+    if not data_flag:
+        counts += [analyzer.DataFrame.Sum("genWeight"), no_id_frame.Sum("genWeight")]
+    n_veto, n_two_valid_no_id = counts[0].GetValue(), counts[1].GetValue()
+    if data_flag:
+        n_veto_weighted, n_two_valid_no_id_weighted = n_veto, n_two_valid_no_id
+    else:
+        n_veto_weighted, n_two_valid_no_id_weighted = counts[2].GetValue(), counts[3].GetValue()
+
+    analyzer.Define(
+        "valid_fatjet_indices",
+        select_jets_expression(preselection_cuts["valid_fatjet_jet_id_min"]),
     )
     analyzer.Define("n_valid_fatjets", "valid_fatjet_indices.size()")
     analyzer.Cut("two_valid_fatjets", "n_valid_fatjets >= 2")
@@ -272,11 +291,11 @@ def event_preselection(options: OptionParser) -> None:
 
     analyzer.Snapshot(snapshot_columns, options.output, "Events", lazy=False, openOption="RECREATE", saveRunChain=True)
 
-    cutflow_labels = ["Total", "Lumi mask", "MET Filters", ">1 fatjets", "Two valid fatjets", f"m_jj > {preselection_cuts['m_jj_skim_min']}"]
-    h_cutflow = build_cutflow_histogram(cutflow_labels, [n_total, n_lumi, n_met, n_one_fatjet, n_two_valid_fatjets, n_mjj_skim], "h_cutflow", "Cutflow; Cut; Events")
+    cutflow_labels = ["Total", "Lumi mask", "MET Filters", ">1 fatjets", "Jet veto map", "Two valid fatjets (no ID)", "Two valid fatjets (+ jet ID)", f"m_jj > {preselection_cuts['m_jj_skim_min']}"]
+    h_cutflow = build_cutflow_histogram(cutflow_labels, [n_total, n_lumi, n_met, n_one_fatjet, n_veto, n_two_valid_no_id, n_two_valid_fatjets, n_mjj_skim], "h_cutflow", "Cutflow; Cut; Events")
     h_cutflow_weighted = build_cutflow_histogram(
         cutflow_labels,
-        [n_total_weighted, n_lumi_weighted, n_met_weighted, n_one_fatjet_weighted, n_two_valid_fatjets_weighted, n_mjj_skim_weighted],
+        [n_total_weighted, n_lumi_weighted, n_met_weighted, n_one_fatjet_weighted, n_veto_weighted, n_two_valid_no_id_weighted, n_two_valid_fatjets_weighted, n_mjj_skim_weighted],
         "h_cutflow_weighted",
         "Weighted cutflow; Cut; Weighted events",
     )

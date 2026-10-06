@@ -2,18 +2,21 @@
 
 using namespace ROOT::VecOps; //RVec
 
-//Returns indices of jets passing pt, eta, and mass cuts.
+//Returns indices of jets passing pt, eta, mass and jet ID cuts.
+//jetId encoding (TIMBER JetID_calculator): 2 = tight, 6 = tight + lepton veto, 0 = fail.
 RVec<int> SelectJets(
     const ROOT::VecOps::RVec<float> &pt,
     const ROOT::VecOps::RVec<float> &eta,
     const ROOT::VecOps::RVec<float> &mass,
+    const ROOT::VecOps::RVec<int> &jetId,
     float ptCut,
     float etaCut,
-    float massCut)
+    float massCut,
+    int jetIdMin)
 {
     ROOT::VecOps::RVec<int> indices;
     for (size_t i = 0; i < pt.size(); ++i) {
-        if (pt[i] > ptCut && std::abs(eta[i]) < etaCut && mass[i] > massCut)
+        if (pt[i] > ptCut && std::abs(eta[i]) < etaCut && mass[i] > massCut && jetId[i] >= jetIdMin)
             indices.push_back(i);
     }
     return indices;

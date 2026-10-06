@@ -5,6 +5,7 @@ PRESELECTION_CUTS = {
         "valid_fatjet_pt_min": 300,
         "valid_fatjet_abs_eta_max": 2.4,
         "valid_fatjet_mass_min": 40,
+        "valid_fatjet_jet_id_min": 2, # FatJet_jetId: 2 = tight, 6 = tight + lepton veto
         "m_jj_skim_min": 800, # Looser than final cut, to allow studying if a lower cut could work
     }
 }
